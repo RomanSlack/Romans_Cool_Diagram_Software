@@ -1,12 +1,30 @@
 "use client";
 
 import { useDiagramStore } from "@/lib/store/diagramStore";
+import {
+  Square,
+  Type,
+  SquareDashed,
+  Undo2,
+  Redo2,
+  Copy,
+  Clipboard,
+  CopyPlus,
+  Trash2,
+  Grid3X3,
+  Magnet,
+  ZoomIn,
+  ZoomOut,
+  MousePointer2,
+  Spline,
+} from "lucide-react";
 
 export function Toolbar() {
   const {
     diagram,
     selectedIds,
     viewport,
+    activeTool,
     updateCanvas,
     addNode,
     addText,
@@ -20,6 +38,7 @@ export function Toolbar() {
     zoomIn,
     zoomOut,
     resetZoom,
+    setActiveTool,
     history,
     historyIndex,
   } = useDiagramStore();
@@ -30,21 +49,36 @@ export function Toolbar() {
 
   return (
     <div className="h-12 bg-white border-b border-gray-200 flex items-center px-3 gap-1">
-      {/* Logo */}
-      <div className="flex items-center gap-2 pr-3 border-r border-gray-200 mr-2">
-        <span className="text-sm font-bold text-gray-900">RCDS</span>
-      </div>
+      {/* Selection Tools */}
+      <ToolGroup>
+        <ToolButton
+          onClick={() => setActiveTool("select")}
+          active={activeTool === "select"}
+          title="Select (V)"
+        >
+          <MousePointer2 size={16} />
+        </ToolButton>
+        <ToolButton
+          onClick={() => setActiveTool("connect")}
+          active={activeTool === "connect"}
+          title="Connect (E)"
+        >
+          <Spline size={16} />
+        </ToolButton>
+      </ToolGroup>
+
+      <Divider />
 
       {/* Add tools */}
       <ToolGroup>
         <ToolButton onClick={() => addNode()} title="Add Node (N)">
-          <RectIcon />
+          <Square size={16} />
         </ToolButton>
         <ToolButton onClick={() => addText()} title="Add Text (T)">
-          <TextIcon />
+          <Type size={16} />
         </ToolButton>
         <ToolButton onClick={() => addContainer()} title="Add Container (C)">
-          <ContainerIcon />
+          <SquareDashed size={16} />
         </ToolButton>
       </ToolGroup>
 
@@ -53,10 +87,10 @@ export function Toolbar() {
       {/* Edit actions */}
       <ToolGroup>
         <ToolButton onClick={undo} disabled={!canUndo} title="Undo (⌘Z)">
-          <UndoIcon />
+          <Undo2 size={16} />
         </ToolButton>
         <ToolButton onClick={redo} disabled={!canRedo} title="Redo (⌘⇧Z)">
-          <RedoIcon />
+          <Redo2 size={16} />
         </ToolButton>
       </ToolGroup>
 
@@ -64,24 +98,24 @@ export function Toolbar() {
 
       <ToolGroup>
         <ToolButton onClick={copy} disabled={!hasSelection} title="Copy (⌘C)">
-          <CopyIcon />
+          <Copy size={16} />
         </ToolButton>
         <ToolButton onClick={() => paste()} title="Paste (⌘V)">
-          <PasteIcon />
+          <Clipboard size={16} />
         </ToolButton>
         <ToolButton
           onClick={() => duplicateElements(selectedIds)}
           disabled={!hasSelection}
           title="Duplicate (⌘D)"
         >
-          <DuplicateIcon />
+          <CopyPlus size={16} />
         </ToolButton>
         <ToolButton
           onClick={() => deleteElements(selectedIds)}
           disabled={!hasSelection}
           title="Delete (⌫)"
         >
-          <TrashIcon />
+          <Trash2 size={16} />
         </ToolButton>
       </ToolGroup>
 
@@ -94,14 +128,14 @@ export function Toolbar() {
           active={diagram.canvas.showGrid}
           title="Toggle Grid"
         >
-          <GridIcon />
+          <Grid3X3 size={16} />
         </ToolButton>
         <ToolButton
           onClick={() => updateCanvas({ snapToGrid: !diagram.canvas.snapToGrid })}
           active={diagram.canvas.snapToGrid}
           title="Snap to Grid"
         >
-          <MagnetIcon />
+          <Magnet size={16} />
         </ToolButton>
       </ToolGroup>
 
@@ -110,7 +144,7 @@ export function Toolbar() {
       {/* Zoom */}
       <ToolGroup>
         <ToolButton onClick={zoomOut} title="Zoom Out">
-          <MinusIcon />
+          <ZoomOut size={16} />
         </ToolButton>
         <button
           onClick={resetZoom}
@@ -119,7 +153,7 @@ export function Toolbar() {
           {Math.round(viewport.zoom * 100)}%
         </button>
         <ToolButton onClick={zoomIn} title="Zoom In">
-          <PlusIcon />
+          <ZoomIn size={16} />
         </ToolButton>
       </ToolGroup>
 
@@ -159,127 +193,13 @@ function ToolButton({ onClick, disabled, active, title, children }: ToolButtonPr
       disabled={disabled}
       title={title}
       className={`
-        w-8 h-8 flex items-center justify-center rounded
+        w-8 h-8 flex items-center justify-center rounded-md
         transition-all duration-100
-        ${active ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"}
+        ${active ? "bg-blue-500 text-white shadow-sm" : "text-gray-600 hover:bg-gray-100"}
         ${disabled ? "opacity-30 cursor-not-allowed" : "cursor-pointer"}
       `}
     >
       {children}
     </button>
-  );
-}
-
-// ============ ICONS ============
-
-function RectIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="2" y="3" width="12" height="10" rx="1" />
-    </svg>
-  );
-}
-
-function TextIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="currentColor">
-      <path d="M3 3h10v2H9v8H7V5H3V3z" />
-    </svg>
-  );
-}
-
-function ContainerIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2,2">
-      <rect x="2" y="3" width="12" height="10" rx="1" />
-    </svg>
-  );
-}
-
-function UndoIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M3 8h8a3 3 0 1 1 0 6H9" />
-      <path d="M6 5L3 8l3 3" />
-    </svg>
-  );
-}
-
-function RedoIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M13 8H5a3 3 0 1 0 0 6h2" />
-      <path d="M10 5l3 3-3 3" />
-    </svg>
-  );
-}
-
-function CopyIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="5" y="5" width="8" height="8" rx="1" />
-      <path d="M3 11V3h8" />
-    </svg>
-  );
-}
-
-function PasteIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="4" y="4" width="10" height="10" rx="1" />
-      <path d="M6 4V3a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v1" />
-    </svg>
-  );
-}
-
-function DuplicateIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <rect x="2" y="2" width="8" height="8" rx="1" />
-      <rect x="6" y="6" width="8" height="8" rx="1" />
-    </svg>
-  );
-}
-
-function TrashIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M3 4h10M6 4V3h4v1M5 4v9h6V4" />
-    </svg>
-  );
-}
-
-function GridIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M2 2h12v12H2z" />
-      <path d="M2 6h12M2 10h12M6 2v12M10 2v12" />
-    </svg>
-  );
-}
-
-function MagnetIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M4 2v4a4 4 0 0 0 8 0V2" />
-      <rect x="2" y="2" width="4" height="3" />
-      <rect x="10" y="2" width="4" height="3" />
-    </svg>
-  );
-}
-
-function MinusIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M3 8h10" />
-    </svg>
-  );
-}
-
-function PlusIcon() {
-  return (
-    <svg className="w-4 h-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-      <path d="M8 3v10M3 8h10" />
-    </svg>
   );
 }

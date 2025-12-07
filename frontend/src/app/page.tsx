@@ -2,8 +2,9 @@
 
 import { useEffect, useRef } from "react";
 import { Canvas } from "@/components/canvas/Canvas";
-import { Toolbar } from "@/components/editor/Toolbar";
+import { FloatingToolbar } from "@/components/editor/FloatingToolbar";
 import { Inspector } from "@/components/editor/Inspector";
+import { LeftSidebar } from "@/components/editor/LeftSidebar";
 import { useDiagramStore } from "@/lib/store/diagramStore";
 import { createNode, createContainer, createEdge, createText } from "@/lib/schema/types";
 
@@ -195,18 +196,18 @@ export default function Home() {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
-      {/* Toolbar */}
-      <Toolbar />
+    <div className="h-screen flex bg-gray-100 overflow-hidden">
+      {/* Left Sidebar */}
+      <LeftSidebar />
 
-      {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Canvas */}
+      {/* Canvas area */}
+      <div className="flex-1 relative overflow-hidden">
         <Canvas />
-
-        {/* Inspector */}
-        <Inspector />
+        <FloatingToolbar />
       </div>
+
+      {/* Inspector */}
+      <Inspector />
     </div>
   );
 }

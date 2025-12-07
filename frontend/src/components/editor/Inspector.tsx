@@ -1,6 +1,7 @@
 "use client";
 
 import { useDiagramStore } from "@/lib/store/diagramStore";
+import { Dropdown } from "@/components/ui/Dropdown";
 import {
   NodeElement,
   TextElement,
@@ -20,7 +21,7 @@ export function Inspector() {
 
   if (!selectedElement) {
     return (
-      <div className="w-72 bg-white border-l border-gray-200 flex flex-col">
+      <div className="w-72 bg-white border-l border-gray-200 flex flex-col animate-fade-in">
         <div className="p-4 border-b border-gray-100">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
             Inspector
@@ -43,7 +44,7 @@ export function Inspector() {
         </h2>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div key={selectedElement.id} className="flex-1 overflow-y-auto animate-fade-in">
         {selectedElement.type === "node" && (
           <NodeInspector
             element={selectedElement as NodeElement}
@@ -166,18 +167,19 @@ function NodeInspector({ element, onChange }: NodeInspectorProps) {
       {/* Shape */}
       <Section title="Shape">
         <Field label="Type">
-          <select
+          <Dropdown
             value={element.shape}
-            onChange={(e) => onChange({ shape: e.target.value as NodeElement["shape"] })}
-            className="input"
-          >
-            <option value="rectangle">Rectangle</option>
-            <option value="rounded">Rounded</option>
-            <option value="pill">Pill</option>
-            <option value="circle">Circle</option>
-            <option value="diamond">Diamond</option>
-            <option value="cylinder">Cylinder</option>
-          </select>
+            onChange={(value) => onChange({ shape: value as NodeElement["shape"] })}
+            options={[
+              { value: "rectangle", label: "Rectangle" },
+              { value: "rounded", label: "Rounded" },
+              { value: "pill", label: "Pill" },
+              { value: "circle", label: "Circle" },
+              { value: "diamond", label: "Diamond" },
+              { value: "cylinder", label: "Cylinder" },
+            ]}
+            size="sm"
+          />
         </Field>
         <Field label="Corner Radius">
           <input
@@ -277,23 +279,24 @@ function NodeInspector({ element, onChange }: NodeInspectorProps) {
           />
         </Field>
         <Field label="Font Weight">
-          <select
+          <Dropdown
             value={element.titleStyle.fontWeight}
-            onChange={(e) =>
+            onChange={(value) =>
               onChange({
                 titleStyle: {
                   ...element.titleStyle,
-                  fontWeight: e.target.value as "normal" | "medium" | "semibold" | "bold",
+                  fontWeight: value as "normal" | "medium" | "semibold" | "bold",
                 },
               })
             }
-            className="input"
-          >
-            <option value="normal">Normal</option>
-            <option value="medium">Medium</option>
-            <option value="semibold">Semibold</option>
-            <option value="bold">Bold</option>
-          </select>
+            options={[
+              { value: "normal", label: "Normal" },
+              { value: "medium", label: "Medium" },
+              { value: "semibold", label: "Semibold" },
+              { value: "bold", label: "Bold" },
+            ]}
+            size="sm"
+          />
         </Field>
         <Field label="Color">
           <div className="flex gap-2 items-center">
@@ -448,23 +451,24 @@ function TextInspector({ element, onChange }: TextInspectorProps) {
           />
         </Field>
         <Field label="Font Weight">
-          <select
+          <Dropdown
             value={element.style.fontWeight}
-            onChange={(e) =>
+            onChange={(value) =>
               onChange({
                 style: {
                   ...element.style,
-                  fontWeight: e.target.value as "normal" | "medium" | "semibold" | "bold",
+                  fontWeight: value as "normal" | "medium" | "semibold" | "bold",
                 },
               })
             }
-            className="input"
-          >
-            <option value="normal">Normal</option>
-            <option value="medium">Medium</option>
-            <option value="semibold">Semibold</option>
-            <option value="bold">Bold</option>
-          </select>
+            options={[
+              { value: "normal", label: "Normal" },
+              { value: "medium", label: "Medium" },
+              { value: "semibold", label: "Semibold" },
+              { value: "bold", label: "Bold" },
+            ]}
+            size="sm"
+          />
         </Field>
         <Field label="Color">
           <div className="flex gap-2 items-center">
@@ -481,22 +485,23 @@ function TextInspector({ element, onChange }: TextInspectorProps) {
           </div>
         </Field>
         <Field label="Align">
-          <select
+          <Dropdown
             value={element.style.textAlign}
-            onChange={(e) =>
+            onChange={(value) =>
               onChange({
                 style: {
                   ...element.style,
-                  textAlign: e.target.value as "left" | "center" | "right",
+                  textAlign: value as "left" | "center" | "right",
                 },
               })
             }
-            className="input"
-          >
-            <option value="left">Left</option>
-            <option value="center">Center</option>
-            <option value="right">Right</option>
-          </select>
+            options={[
+              { value: "left", label: "Left" },
+              { value: "center", label: "Center" },
+              { value: "right", label: "Right" },
+            ]}
+            size="sm"
+          />
         </Field>
       </Section>
 
@@ -547,27 +552,28 @@ function ContainerInspector({ element, onChange }: ContainerInspectorProps) {
           />
         </Field>
         <Field label="Position">
-          <select
+          <Dropdown
             value={element.label?.position || "bottom-center"}
-            onChange={(e) =>
+            onChange={(value) =>
               onChange({
                 label: element.label
                   ? {
                       ...element.label,
-                      position: e.target.value as NonNullable<ContainerElement["label"]>["position"],
+                      position: value as NonNullable<ContainerElement["label"]>["position"],
                     }
                   : undefined,
               })
             }
-            className="input"
-          >
-            <option value="top-left">Top Left</option>
-            <option value="top-center">Top Center</option>
-            <option value="top-right">Top Right</option>
-            <option value="bottom-left">Bottom Left</option>
-            <option value="bottom-center">Bottom Center</option>
-            <option value="bottom-right">Bottom Right</option>
-          </select>
+            options={[
+              { value: "top-left", label: "Top Left" },
+              { value: "top-center", label: "Top Center" },
+              { value: "top-right", label: "Top Right" },
+              { value: "bottom-left", label: "Bottom Left" },
+              { value: "bottom-center", label: "Bottom Center" },
+              { value: "bottom-right", label: "Bottom Right" },
+            ]}
+            size="sm"
+          />
         </Field>
       </Section>
 
@@ -697,17 +703,18 @@ function EdgeInspector({ element, onChange }: EdgeInspectorProps) {
     <div className="p-4 space-y-6">
       <Section title="Routing">
         <Field label="Type">
-          <select
+          <Dropdown
             value={element.routing}
-            onChange={(e) =>
-              onChange({ routing: e.target.value as "orthogonal" | "straight" | "curved" })
+            onChange={(value) =>
+              onChange({ routing: value as "orthogonal" | "straight" | "curved" })
             }
-            className="input"
-          >
-            <option value="orthogonal">Orthogonal</option>
-            <option value="straight">Straight</option>
-            <option value="curved">Curved</option>
-          </select>
+            options={[
+              { value: "orthogonal", label: "Orthogonal" },
+              { value: "straight", label: "Straight" },
+              { value: "curved", label: "Curved" },
+            ]}
+            size="sm"
+          />
         </Field>
       </Section>
 

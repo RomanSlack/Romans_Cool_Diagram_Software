@@ -7,6 +7,7 @@ import { TextRenderer } from "./TextRenderer";
 import { ContainerRenderer } from "./ContainerRenderer";
 import { EdgeRenderer } from "./EdgeRenderer";
 import { SelectionBox } from "./SelectionBox";
+import { ConnectionHandles } from "./ConnectionHandles";
 import { DiagramElement, NodeElement, TextElement, ContainerElement, EdgeElement } from "@/lib/schema/types";
 
 export function Canvas() {
@@ -17,6 +18,7 @@ export function Canvas() {
     diagram,
     selectedIds,
     viewport,
+    activeTool,
     select,
     selectAdd,
     clearSelection,
@@ -28,6 +30,8 @@ export function Canvas() {
     undo,
     redo,
     pushHistory,
+    addEdge,
+    setActiveTool,
   } = useDiagramStore();
 
   // Drag state
@@ -35,6 +39,12 @@ export function Canvas() {
   const [isPanning, setIsPanning] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [dragElementStart, setDragElementStart] = useState<{ [key: string]: { x: number; y: number } }>({});
+
+  // Connection state
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStart, setConnectionStart] = useState<{ elementId: string; anchor: string } | null>(null);
+  const [connectionEnd, setConnectionEnd] = useState<{ x: number; y: number } | null>(null);
+  const [hoveredElement, setHoveredElement] = useState<string | null>(null);
 
   // Convert screen coords to canvas coords
   const screenToCanvas = useCallback(
@@ -123,12 +133,19 @@ export function Canvas() {
         select(diagram.elements.map((el) => el.id));
       } else if (e.key === "Escape") {
         clearSelection();
+        setIsConnecting(false);
+        setConnectionStart(null);
+        setConnectionEnd(null);
+      } else if (e.key === "v" || e.key === "V") {
+        setActiveTool("select");
+      } else if (e.key === "e" || e.key === "E") {
+        setActiveTool("connect");
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedIds, deleteElements, copy, paste, undo, redo, select, clearSelection, diagram.elements]);
+  }, [selectedIds, deleteElements, copy, paste, undo, redo, select, clearSelection, diagram.elements, setActiveTool]);
 
   // Mouse down on canvas (for panning or selection)
   const handleMouseDown = useCallback(
@@ -153,6 +170,10 @@ export function Canvas() {
           x: e.clientX - dragStart.x,
           y: e.clientY - dragStart.y,
         });
+      } else if (isConnecting && connectionStart) {
+        // Update connection preview
+        const canvasPos = screenToCanvas(e.clientX, e.clientY);
+        setConnectionEnd(canvasPos);
       } else if (isDragging && selectedIds.length > 0) {
         const canvasPos = screenToCanvas(e.clientX, e.clientY);
         const dx = canvasPos.x - dragStart.x;
@@ -176,22 +197,72 @@ export function Canvas() {
         });
       }
     },
-    [isPanning, isDragging, dragStart, selectedIds, dragElementStart, screenToCanvas, setViewport, updateElement, diagram.canvas]
+    [isPanning, isDragging, isConnecting, connectionStart, dragStart, selectedIds, dragElementStart, screenToCanvas, setViewport, updateElement, diagram.canvas]
   );
 
   // Mouse up
-  const handleMouseUp = useCallback(() => {
-    if (isDragging) {
-      pushHistory();
-    }
-    setIsDragging(false);
-    setIsPanning(false);
-  }, [isDragging, pushHistory]);
+  const handleMouseUp = useCallback(
+    (e: React.MouseEvent) => {
+      if (isConnecting && connectionStart) {
+        // Check if we're over an element to connect to
+        const canvasPos = screenToCanvas(e.clientX, e.clientY);
+        const targetElement = diagram.elements.find((el) => {
+          if (el.type === "edge" || el.id === connectionStart.elementId) return false;
+          return (
+            canvasPos.x >= el.position.x &&
+            canvasPos.x <= el.position.x + el.size.width &&
+            canvasPos.y >= el.position.y &&
+            canvasPos.y <= el.position.y + el.size.height
+          );
+        });
+
+        if (targetElement) {
+          // Determine target anchor based on where we dropped
+          const relX = (canvasPos.x - targetElement.position.x) / targetElement.size.width;
+          const relY = (canvasPos.y - targetElement.position.y) / targetElement.size.height;
+          let targetAnchor = "auto";
+
+          if (relX < 0.3) targetAnchor = "left";
+          else if (relX > 0.7) targetAnchor = "right";
+          else if (relY < 0.3) targetAnchor = "top";
+          else if (relY > 0.7) targetAnchor = "bottom";
+
+          addEdge(connectionStart.elementId, targetElement.id, connectionStart.anchor, targetAnchor);
+        }
+
+        setIsConnecting(false);
+        setConnectionStart(null);
+        setConnectionEnd(null);
+      }
+
+      if (isDragging) {
+        pushHistory();
+      }
+      setIsDragging(false);
+      setIsPanning(false);
+    },
+    [isConnecting, connectionStart, isDragging, pushHistory, screenToCanvas, diagram.elements, addEdge]
+  );
+
+  // Start connection from handle
+  const handleConnectionStart = useCallback((elementId: string, anchor: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsConnecting(true);
+    setConnectionStart({ elementId, anchor });
+    const canvasPos = screenToCanvas(e.clientX, e.clientY);
+    setConnectionEnd(canvasPos);
+  }, [screenToCanvas]);
 
   // Element click handler
   const handleElementMouseDown = useCallback(
     (e: React.MouseEvent, element: DiagramElement) => {
       e.stopPropagation();
+
+      // If in connect mode, start connection
+      if (activeTool === "connect" && element.type !== "edge") {
+        handleConnectionStart(element.id, "auto", e);
+        return;
+      }
 
       if (e.shiftKey) {
         selectAdd(element.id);
@@ -221,22 +292,57 @@ export function Canvas() {
         select([element.id]);
       }
     },
-    [selectedIds, select, selectAdd, screenToCanvas, diagram.elements]
+    [selectedIds, select, selectAdd, screenToCanvas, diagram.elements, activeTool, handleConnectionStart]
   );
+
+  // Get connection point for preview line
+  const getElementConnectionPoint = (elementId: string, anchor: string) => {
+    const el = diagram.elements.find((e) => e.id === elementId);
+    if (!el) return { x: 0, y: 0 };
+
+    const cx = el.position.x + el.size.width / 2;
+    const cy = el.position.y + el.size.height / 2;
+
+    switch (anchor) {
+      case "top":
+        return { x: cx, y: el.position.y };
+      case "bottom":
+        return { x: cx, y: el.position.y + el.size.height };
+      case "left":
+        return { x: el.position.x, y: cy };
+      case "right":
+        return { x: el.position.x + el.size.width, y: cy };
+      default:
+        return { x: cx, y: cy };
+    }
+  };
 
   // Render elements by type
   const renderElement = (element: DiagramElement) => {
     const isSelected = selectedIds.includes(element.id);
+    const isHovered = hoveredElement === element.id;
 
     switch (element.type) {
       case "node":
         return (
-          <NodeRenderer
+          <g
             key={element.id}
-            element={element as NodeElement}
-            isSelected={isSelected}
-            onMouseDown={(e) => handleElementMouseDown(e, element)}
-          />
+            onMouseEnter={() => setHoveredElement(element.id)}
+            onMouseLeave={() => setHoveredElement(null)}
+          >
+            <NodeRenderer
+              element={element as NodeElement}
+              isSelected={isSelected}
+              onMouseDown={(e) => handleElementMouseDown(e, element)}
+            />
+            {(isHovered || isSelected || activeTool === "connect") && (
+              <ConnectionHandles
+                element={element}
+                onStartConnection={handleConnectionStart}
+                zoom={viewport.zoom}
+              />
+            )}
+          </g>
         );
       case "text":
         return (
@@ -249,12 +355,24 @@ export function Canvas() {
         );
       case "container":
         return (
-          <ContainerRenderer
+          <g
             key={element.id}
-            element={element as ContainerElement}
-            isSelected={isSelected}
-            onMouseDown={(e) => handleElementMouseDown(e, element)}
-          />
+            onMouseEnter={() => setHoveredElement(element.id)}
+            onMouseLeave={() => setHoveredElement(null)}
+          >
+            <ContainerRenderer
+              element={element as ContainerElement}
+              isSelected={isSelected}
+              onMouseDown={(e) => handleElementMouseDown(e, element)}
+            />
+            {(isHovered || isSelected || activeTool === "connect") && (
+              <ConnectionHandles
+                element={element}
+                onStartConnection={handleConnectionStart}
+                zoom={viewport.zoom}
+              />
+            )}
+          </g>
         );
       case "edge":
         return (
@@ -280,7 +398,10 @@ export function Canvas() {
   return (
     <div
       ref={containerRef}
-      className="flex-1 overflow-hidden bg-gray-50 cursor-grab active:cursor-grabbing relative"
+      id="diagram-canvas"
+      className={`flex-1 overflow-hidden bg-gray-50 relative ${
+        activeTool === "connect" ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"
+      }`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -338,6 +459,27 @@ export function Canvas() {
               />
             );
           })}
+
+          {/* Connection preview line */}
+          {isConnecting && connectionStart && connectionEnd && (
+            <g>
+              <line
+                x1={getElementConnectionPoint(connectionStart.elementId, connectionStart.anchor).x}
+                y1={getElementConnectionPoint(connectionStart.elementId, connectionStart.anchor).y}
+                x2={connectionEnd.x}
+                y2={connectionEnd.y}
+                stroke="#2563eb"
+                strokeWidth={2 / viewport.zoom}
+                strokeDasharray={`${4 / viewport.zoom},${4 / viewport.zoom}`}
+              />
+              <circle
+                cx={connectionEnd.x}
+                cy={connectionEnd.y}
+                r={4 / viewport.zoom}
+                fill="#2563eb"
+              />
+            </g>
+          )}
         </g>
       </svg>
 
