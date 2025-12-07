@@ -1,103 +1,109 @@
 "use client";
 
-import { DiagramContainer, Theme } from "@/lib/schema/types";
-import { resolveColor, resolveFont } from "@/themes/academic";
+import { ContainerElement } from "@/lib/schema/types";
 
 interface ContainerRendererProps {
-  container: DiagramContainer;
-  theme: Theme;
-  selected?: boolean;
-  onSelect?: (containerId: string) => void;
+  element: ContainerElement;
+  isSelected: boolean;
+  onMouseDown: (e: React.MouseEvent) => void;
 }
 
-export function ContainerRenderer({
-  container,
-  theme,
-  selected = false,
-  onSelect,
-}: ContainerRendererProps) {
-  const { bounds, style, label } = container;
+export function ContainerRenderer({ element, onMouseDown }: ContainerRendererProps) {
+  const { position, size, style, label } = element;
 
-  // Resolve colors
-  const fillColor = resolveColor(style.fill, theme);
-  const strokeColor = resolveColor(style.stroke, theme);
-
-  // Label position calculations
-  let labelX: number;
-  let labelY: number;
-  let textAnchor: "start" | "middle" | "end" = "middle";
-
-  switch (label.position) {
-    case "top-left":
-      labelX = bounds.x + 10;
-      labelY = bounds.y + bounds.height + label.size + 4;
-      textAnchor = "start";
-      break;
-    case "top-center":
-      labelX = bounds.x + bounds.width / 2;
-      labelY = bounds.y - 8;
-      textAnchor = "middle";
-      break;
-    case "bottom-center":
-    default:
-      labelX = bounds.x + bounds.width / 2;
-      labelY = bounds.y + bounds.height + label.size + 4;
-      textAnchor = "middle";
-      break;
-  }
-
-  const fontFamily = resolveFont(label.font, theme);
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSelect?.(container.id);
+  const getFontWeight = (weight: string): number => {
+    const weights: { [key: string]: number } = {
+      normal: 400,
+      medium: 500,
+      semibold: 600,
+      bold: 700,
+    };
+    return weights[weight] || 400;
   };
 
+  // Calculate label position
+  const getLabelPosition = () => {
+    if (!label) return { x: 0, y: 0, anchor: "middle" as const };
+
+    const padding = 8;
+    let x = size.width / 2;
+    let y = 0;
+    let anchor: "start" | "middle" | "end" = "middle";
+
+    switch (label.position) {
+      case "top-left":
+        x = padding;
+        y = -8;
+        anchor = "start";
+        break;
+      case "top-center":
+        x = size.width / 2;
+        y = -8;
+        anchor = "middle";
+        break;
+      case "top-right":
+        x = size.width - padding;
+        y = -8;
+        anchor = "end";
+        break;
+      case "bottom-left":
+        x = padding;
+        y = size.height + 16;
+        anchor = "start";
+        break;
+      case "bottom-center":
+        x = size.width / 2;
+        y = size.height + 16;
+        anchor = "middle";
+        break;
+      case "bottom-right":
+        x = size.width - padding;
+        y = size.height + 16;
+        anchor = "end";
+        break;
+    }
+
+    return { x, y, anchor };
+  };
+
+  const labelPos = getLabelPosition();
+
   return (
-    <g onClick={handleClick} style={{ cursor: "pointer" }}>
+    <g
+      transform={`translate(${position.x}, ${position.y})`}
+      onMouseDown={onMouseDown}
+      style={{ cursor: "move" }}
+    >
       {/* Container rectangle */}
       <rect
-        x={bounds.x}
-        y={bounds.y}
-        width={bounds.width}
-        height={bounds.height}
+        x={0}
+        y={0}
+        width={size.width}
+        height={size.height}
         rx={style.borderRadius}
         ry={style.borderRadius}
-        fill={fillColor}
+        fill={style.fill}
         fillOpacity={style.fillOpacity}
-        stroke={selected ? "#2196F3" : strokeColor}
-        strokeWidth={selected ? style.strokeWidth + 1 : style.strokeWidth}
+        stroke={style.stroke}
+        strokeWidth={style.strokeWidth}
         strokeDasharray={style.strokeDasharray}
       />
 
-      {/* Selection indicator */}
-      {selected && (
-        <rect
-          x={bounds.x - 2}
-          y={bounds.y - 2}
-          width={bounds.width + 4}
-          height={bounds.height + 4}
-          rx={style.borderRadius + 2}
-          ry={style.borderRadius + 2}
-          fill="none"
-          stroke="#2196F3"
-          strokeWidth={1}
-          strokeDasharray="4,2"
-        />
+      {/* Label */}
+      {label && (
+        <text
+          x={labelPos.x}
+          y={labelPos.y}
+          textAnchor={labelPos.anchor}
+          dominantBaseline="middle"
+          fontFamily={label.style.fontFamily}
+          fontSize={label.style.fontSize}
+          fontWeight={getFontWeight(label.style.fontWeight)}
+          fill={label.style.color}
+        >
+          {label.text}
+        </text>
       )}
-
-      {/* Container label */}
-      <text
-        x={labelX}
-        y={labelY}
-        textAnchor={textAnchor}
-        fontFamily={fontFamily}
-        fontSize={label.size}
-        fontWeight={label.weight || "bold"}
-        fill={theme.colors.text}
-      >
-        {label.text}
-      </text>
     </g>
   );
 }

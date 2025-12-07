@@ -1,291 +1,212 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
-import { DiagramCanvas } from "@/components/canvas/DiagramCanvas";
-import { Sidebar } from "@/components/editor/Sidebar";
-import { ProjectsPanel } from "@/components/editor/ProjectsPanel";
-import { sampleDiagram } from "@/data/sample-diagram";
-import { Diagram, DiagramNode } from "@/lib/schema/types";
-import { exportToPng, exportToSvg, exportToPdf } from "@/lib/export";
-import { v4 as uuid } from "uuid";
-import { defaultNodeTemplates } from "@/themes/academic";
-import {
-  Project,
-  createProject,
-  updateProjectDiagram,
-} from "@/lib/store/db";
-
-// Create a blank diagram
-function createBlankDiagram(): Diagram {
-  return {
-    id: uuid(),
-    name: "Untitled Diagram",
-    version: "1.0",
-    canvas: {
-      width: 1200,
-      height: 800,
-      background: "#FFFFFF",
-      gridEnabled: false,
-      gridSize: 20,
-      snapToGrid: false,
-    },
-    theme: "academic",
-    nodeTemplates: {},
-    nodes: [],
-    edges: [],
-    containers: [],
-  };
-}
+import { useEffect, useRef } from "react";
+import { Canvas } from "@/components/canvas/Canvas";
+import { Toolbar } from "@/components/editor/Toolbar";
+import { Inspector } from "@/components/editor/Inspector";
+import { useDiagramStore } from "@/lib/store/diagramStore";
+import { createNode, createContainer, createEdge, createText } from "@/lib/schema/types";
 
 export default function Home() {
-  const [diagram, setDiagram] = useState<Diagram>(sampleDiagram);
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
-  const [showGrid, setShowGrid] = useState(false);
-  const [snapToGrid, setSnapToGrid] = useState(false);
-  const [editable, setEditable] = useState(true);
-  const [showProjectsPanel, setShowProjectsPanel] = useState(false);
+  const { setDiagram, diagram } = useDiagramStore();
+  const initialized = useRef(false);
 
-  const canvasRef = useRef<HTMLDivElement>(null);
-
-  // Mark changes as unsaved when diagram changes
+  // Initialize with a sample diagram on first load
   useEffect(() => {
-    if (currentProjectId) {
-      setHasUnsavedChanges(true);
-    }
-  }, [diagram, currentProjectId]);
-
-  // Handle node movement
-  const handleNodeMove = useCallback(
-    (nodeId: string, position: { x: number; y: number }) => {
-      setDiagram((prev) => ({
-        ...prev,
-        nodes: prev.nodes.map((node) =>
-          node.id === nodeId ? { ...node, position } : node
-        ),
-      }));
-    },
-    []
-  );
-
-  // Toggle snap to grid
-  const toggleSnapToGrid = useCallback(() => {
-    setSnapToGrid((prev) => !prev);
-    setDiagram((prev) => ({
-      ...prev,
-      canvas: { ...prev.canvas, snapToGrid: !prev.canvas.snapToGrid },
-    }));
-  }, []);
-
-  // Add new node
-  const handleAddNode = useCallback(
-    (templateId: string) => {
-      const template =
-        defaultNodeTemplates[templateId] || diagram.nodeTemplates[templateId];
-      if (!template) return;
-
-      const newNode: DiagramNode = {
-        id: `node-${uuid().slice(0, 8)}`,
-        templateId,
-        position: {
-          x: 100 + Math.random() * 200,
-          y: 100 + Math.random() * 200,
+    if (!initialized.current && diagram.elements.length === 0) {
+      initialized.current = true;
+      // Create a sample diagram
+      const userNode = createNode({
+        id: "user",
+        position: { x: 50, y: 200 },
+        size: { width: 80, height: 60 },
+        content: { title: "User", subtitle: "Flutter App" },
+        style: {
+          fill: "#F5F5F5",
+          fillOpacity: 1,
+          stroke: "#333333",
+          strokeWidth: 1,
+          borderRadius: 6,
+          shadow: { x: 2, y: 2, blur: 4, color: "rgba(0,0,0,0.1)" },
         },
-        content: {
-          title: template.name,
-          subtitle: "",
+      });
+
+      const apiGateway = createNode({
+        id: "api-gateway",
+        position: { x: 180, y: 195 },
+        size: { width: 120, height: 50 },
+        content: { title: "API Gateway", subtitle: "FastAPI" },
+        style: {
+          fill: "#D8E5F3",
+          fillOpacity: 1,
+          stroke: "#333333",
+          strokeWidth: 1.5,
+          borderRadius: 6,
+          shadow: { x: 2, y: 2, blur: 4, color: "rgba(0,0,0,0.1)" },
         },
-      };
+      });
 
-      setDiagram((prev) => ({
-        ...prev,
-        nodes: [...prev.nodes, newNode],
-      }));
+      const primaryAgent = createNode({
+        id: "primary-agent",
+        position: { x: 380, y: 100 },
+        size: { width: 140, height: 60 },
+        content: { title: "Primary Agent", subtitle: "Orchestrator" },
+        style: {
+          fill: "#D8E5F3",
+          fillOpacity: 1,
+          stroke: "#1976D2",
+          strokeWidth: 2.5,
+          borderRadius: 6,
+          shadow: { x: 2, y: 2, blur: 4, color: "rgba(0,0,0,0.1)" },
+        },
+      });
 
-      setSelectedNodeId(newNode.id);
-    },
-    [diagram.nodeTemplates]
-  );
+      const geminiApi = createNode({
+        id: "gemini-api",
+        position: { x: 600, y: 100 },
+        size: { width: 100, height: 50 },
+        content: { title: "Gemini API", subtitle: "gemini-3-pro" },
+        style: {
+          fill: "#F5F5F5",
+          fillOpacity: 1,
+          stroke: "#333333",
+          strokeWidth: 1,
+          borderRadius: 6,
+          shadow: { x: 2, y: 2, blur: 4, color: "rgba(0,0,0,0.1)" },
+        },
+      });
 
-  // Delete node
-  const handleDeleteNode = useCallback((nodeId: string) => {
-    setDiagram((prev) => ({
-      ...prev,
-      nodes: prev.nodes.filter((n) => n.id !== nodeId),
-      edges: prev.edges.filter(
-        (e) => e.source.nodeId !== nodeId && e.target.nodeId !== nodeId
-      ),
-    }));
-    setSelectedNodeId(null);
-  }, []);
+      const memoryRetriever = createNode({
+        id: "memory-retriever",
+        position: { x: 400, y: 260 },
+        size: { width: 130, height: 55 },
+        content: { title: "Memory Retriever", subtitle: "Before LLM call" },
+        style: {
+          fill: "#E6E0EC",
+          fillOpacity: 1,
+          stroke: "#333333",
+          strokeWidth: 1,
+          borderRadius: 6,
+          shadow: { x: 2, y: 2, blur: 4, color: "rgba(0,0,0,0.1)" },
+        },
+      });
 
-  // Update node
-  const handleUpdateNode = useCallback(
-    (nodeId: string, updates: Partial<DiagramNode>) => {
-      setDiagram((prev) => ({
-        ...prev,
-        nodes: prev.nodes.map((node) =>
-          node.id === nodeId ? { ...node, ...updates } : node
-        ),
-      }));
-    },
-    []
-  );
+      const memoryCreator = createNode({
+        id: "memory-creator",
+        position: { x: 400, y: 340 },
+        size: { width: 130, height: 55 },
+        content: { title: "Memory Creator", subtitle: "After LLM call" },
+        style: {
+          fill: "#E6E0EC",
+          fillOpacity: 1,
+          stroke: "#333333",
+          strokeWidth: 1,
+          borderRadius: 6,
+          shadow: { x: 2, y: 2, blur: 4, color: "rgba(0,0,0,0.1)" },
+        },
+      });
 
-  // Export handlers
-  const handleExport = useCallback(
-    async (format: "png" | "svg" | "pdf") => {
-      const element = canvasRef.current?.querySelector("svg");
-      if (!element) return;
+      const memoryContainer = createContainer({
+        id: "memory-container",
+        position: { x: 380, y: 240 },
+        size: { width: 170, height: 180 },
+        label: {
+          text: "Proactive Memory System",
+          position: "bottom-center",
+          style: {
+            fontFamily: "Inter, system-ui, sans-serif",
+            fontSize: 11,
+            fontWeight: "semibold",
+            color: "#333333",
+            textAlign: "center",
+          },
+        },
+      });
 
-      const filename = `${diagram.name.replace(/\s+/g, "-").toLowerCase()}`;
+      const titleText = createText({
+        id: "title",
+        position: { x: 200, y: 30 },
+        size: { width: 500, height: 40 },
+        content: "VOS: Multi-Agent Architecture",
+        style: {
+          fontFamily: "Georgia, serif",
+          fontSize: 18,
+          fontWeight: "bold",
+          color: "#1a1a1a",
+          textAlign: "center",
+        },
+      });
 
-      try {
-        switch (format) {
-          case "png":
-            await exportToPng(
-              element as unknown as HTMLElement,
-              `${filename}.png`
-            );
-            break;
-          case "svg":
-            await exportToSvg(
-              element as unknown as HTMLElement,
-              `${filename}.svg`
-            );
-            break;
-          case "pdf":
-            await exportToPdf(
-              element as unknown as HTMLElement,
-              `${filename}.pdf`
-            );
-            break;
-        }
-      } catch (error) {
-        console.error(`Export to ${format} failed:`, error);
-      }
-    },
-    [diagram.name]
-  );
+      const edge1 = createEdge("user", "api-gateway", {
+        id: "edge-1",
+        routing: "orthogonal",
+      });
 
-  // Save project
-  const handleSave = useCallback(async () => {
-    try {
-      if (currentProjectId) {
-        await updateProjectDiagram(currentProjectId, diagram);
-      } else {
-        const project = await createProject(diagram);
-        setCurrentProjectId(project.id);
-      }
-      setHasUnsavedChanges(false);
-    } catch (error) {
-      console.error("Failed to save:", error);
+      const edge2 = createEdge("api-gateway", "primary-agent", {
+        id: "edge-2",
+        routing: "orthogonal",
+      });
+
+      const edge3 = createEdge("primary-agent", "gemini-api", {
+        id: "edge-3",
+        routing: "orthogonal",
+      });
+
+      const edge4 = createEdge("primary-agent", "memory-retriever", {
+        id: "edge-4",
+        routing: "orthogonal",
+      });
+
+      const edge5 = createEdge("memory-retriever", "memory-creator", {
+        id: "edge-5",
+        routing: "orthogonal",
+      });
+
+      setDiagram({
+        id: "sample",
+        name: "VOS Multi-Agent Architecture",
+        version: "1.0",
+        canvas: {
+          width: 1920,
+          height: 1080,
+          background: "#ffffff",
+          gridSize: 20,
+          snapToGrid: false,
+          showGrid: false,
+        },
+        elements: [
+          memoryContainer,
+          titleText,
+          userNode,
+          apiGateway,
+          primaryAgent,
+          geminiApi,
+          memoryRetriever,
+          memoryCreator,
+          edge1,
+          edge2,
+          edge3,
+          edge4,
+          edge5,
+        ],
+      });
     }
-  }, [currentProjectId, diagram]);
-
-  // Select project
-  const handleSelectProject = useCallback(async (project: Project) => {
-    setDiagram(project.diagram);
-    setCurrentProjectId(project.id);
-    setHasUnsavedChanges(false);
-    setShowProjectsPanel(false);
-    setSelectedNodeId(null);
-  }, []);
-
-  // New project
-  const handleNewProject = useCallback(() => {
-    const newDiagram = createBlankDiagram();
-    setDiagram(newDiagram);
-    setCurrentProjectId(null);
-    setHasUnsavedChanges(false);
-    setShowProjectsPanel(false);
-    setSelectedNodeId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
-    <div className="h-screen flex bg-gray-100 overflow-hidden">
-      {/* Sidebar */}
-      <Sidebar
-        diagram={diagram}
-        selectedNodeId={selectedNodeId}
-        showGrid={showGrid}
-        snapToGrid={snapToGrid}
-        editable={editable}
-        hasUnsavedChanges={hasUnsavedChanges}
-        onToggleGrid={() => setShowGrid(!showGrid)}
-        onToggleSnap={toggleSnapToGrid}
-        onToggleEditable={() => setEditable(!editable)}
-        onAddNode={handleAddNode}
-        onDeleteNode={handleDeleteNode}
-        onUpdateNode={handleUpdateNode}
-        onExport={handleExport}
-        onSave={handleSave}
-        onOpenProjects={() => setShowProjectsPanel(true)}
-      />
+    <div className="h-screen flex flex-col bg-gray-100 overflow-hidden">
+      {/* Toolbar */}
+      <Toolbar />
 
-      {/* Main Canvas Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
-        <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center">
-          <div className="flex-1">
-            <input
-              type="text"
-              value={diagram.name}
-              onChange={(e) =>
-                setDiagram((prev) => ({ ...prev, name: e.target.value }))
-              }
-              className="
-                text-sm font-medium text-gray-800
-                bg-transparent border-none
-                focus:outline-none focus:ring-0
-                hover:bg-gray-50 focus:bg-gray-50
-                px-2 py-1 -ml-2 rounded
-                transition-colors
-              "
-            />
-          </div>
-          {selectedNodeId && (
-            <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-              Selected: {selectedNodeId}
-            </div>
-          )}
-        </div>
-
+      {/* Main content */}
+      <div className="flex-1 flex overflow-hidden">
         {/* Canvas */}
-        <div className="flex-1 overflow-auto p-6 flex items-start justify-center">
-          <div
-            ref={canvasRef}
-            className="bg-white rounded-xl overflow-hidden"
-            style={{
-              boxShadow:
-                "0 4px 24px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04)",
-            }}
-          >
-            <DiagramCanvas
-              diagram={diagram}
-              editable={editable}
-              showGrid={showGrid}
-              selectedNodeId={selectedNodeId}
-              selectedEdgeId={selectedEdgeId}
-              onNodeSelect={setSelectedNodeId}
-              onEdgeSelect={setSelectedEdgeId}
-              onNodeMove={handleNodeMove}
-            />
-          </div>
-        </div>
-      </div>
+        <Canvas />
 
-      {/* Projects Panel */}
-      {showProjectsPanel && (
-        <ProjectsPanel
-          currentProjectId={currentProjectId}
-          onSelectProject={handleSelectProject}
-          onNewProject={handleNewProject}
-          onClose={() => setShowProjectsPanel(false)}
-        />
-      )}
+        {/* Inspector */}
+        <Inspector />
+      </div>
     </div>
   );
 }

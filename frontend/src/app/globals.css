@@ -3,25 +3,100 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #f8f9fa;
+  --foreground: #1a1a1a;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+/* Input styles for inspector */
+@layer components {
+  .input {
+    @apply w-full px-2.5 py-1.5 text-sm
+      bg-gray-50 text-gray-900
+      border border-gray-200 rounded-md
+      focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500
+      placeholder:text-gray-400
+      transition-all duration-150;
   }
+
+  .input:disabled {
+    @apply bg-gray-100 text-gray-500 cursor-not-allowed;
+  }
+
+  /* Number input specific */
+  input[type="number"].input {
+    @apply font-mono text-xs;
+  }
+
+  /* Color input */
+  input[type="color"] {
+    @apply cursor-pointer;
+    -webkit-appearance: none;
+    border: none;
+    padding: 0;
+  }
+
+  input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+  }
+
+  input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
+  }
+
+  /* Range input */
+  input[type="range"] {
+    @apply h-1 bg-gray-200 rounded-full cursor-pointer;
+    -webkit-appearance: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    @apply w-3 h-3 bg-gray-700 rounded-full cursor-pointer;
+    -webkit-appearance: none;
+  }
+
+  input[type="range"]::-webkit-slider-thumb:hover {
+    @apply bg-gray-900;
+  }
+
+  /* Checkbox */
+  input[type="checkbox"] {
+    @apply rounded border-gray-300 text-blue-600 focus:ring-blue-500/20;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+/* Selection */
+::selection {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+/* Prevent text selection during drag */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
 }

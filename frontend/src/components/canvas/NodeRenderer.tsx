@@ -1,215 +1,146 @@
 "use client";
 
-import { DiagramNode, NodeTemplate, Theme } from "@/lib/schema/types";
-import { resolveColor, resolveFont } from "@/themes/academic";
+import { NodeElement } from "@/lib/schema/types";
 
 interface NodeRendererProps {
-  node: DiagramNode;
-  template: NodeTemplate;
-  theme: Theme;
-  selected?: boolean;
-  onSelect?: (nodeId: string) => void;
-  onDragStart?: (nodeId: string, e: React.MouseEvent) => void;
+  element: NodeElement;
+  isSelected: boolean;
+  onMouseDown: (e: React.MouseEvent) => void;
 }
 
-export function NodeRenderer({
-  node,
-  template,
-  theme,
-  selected = false,
-  onSelect,
-  onDragStart,
-}: NodeRendererProps) {
-  // Merge template style with node overrides
-  const style = {
-    ...template.style,
-    ...node.styleOverrides,
+export function NodeRenderer({ element, onMouseDown }: NodeRendererProps) {
+  const { position, size, style, content, titleStyle, subtitleStyle, shape } = element;
+
+  // Generate shadow filter ID
+  const shadowId = `shadow-${element.id}`;
+
+  // Calculate border radius based on shape
+  const getBorderRadius = () => {
+    switch (shape) {
+      case "rectangle":
+        return 0;
+      case "rounded":
+        return style.borderRadius;
+      case "pill":
+        return Math.min(size.width, size.height) / 2;
+      case "circle":
+        return Math.min(size.width, size.height) / 2;
+      default:
+        return style.borderRadius;
+    }
   };
 
-  // Resolve colors from theme tokens
-  const fillColor = resolveColor(style.fill, theme);
-  const strokeColor = resolveColor(style.stroke, theme);
+  const borderRadius = getBorderRadius();
 
-  // Get dimensions
-  const width = node.size?.width ?? style.width;
-  const height = node.size?.height ?? style.height;
-
-  // Calculate text positions
-  const centerX = width / 2;
-  const centerY = height / 2;
-
-  const titleY =
-    template.layout.titlePosition === "center"
-      ? centerY - (node.content.subtitle ? 6 : 0)
-      : 20;
-
-  const subtitleY =
-    template.layout.subtitlePosition === "below-title"
-      ? titleY + template.typography.titleSize + 4
-      : height - 12;
-
-  // Font families
-  const titleFont = resolveFont(template.typography.titleFont, theme);
-  const subtitleFont = resolveFont(template.typography.subtitleFont, theme);
-
-  // Shadow filter ID
-  const shadowId = `shadow-${node.id}`;
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSelect?.(node.id);
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDragStart?.(node.id, e);
-  };
+  // Text positioning
+  const centerX = size.width / 2;
+  const centerY = size.height / 2;
+  const hasSubtitle = content.subtitle && content.subtitle.trim() !== "";
+  const titleY = hasSubtitle ? centerY - 8 : centerY;
+  const subtitleY = titleY + titleStyle.fontSize + 4;
 
   return (
     <g
-      transform={`translate(${node.position.x}, ${node.position.y})`}
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      style={{ cursor: "pointer" }}
+      transform={`translate(${position.x}, ${position.y})`}
+      onMouseDown={onMouseDown}
+      style={{ cursor: "move" }}
     >
-      {/* Shadow filter definition */}
+      {/* Shadow filter */}
       {style.shadow && (
         <defs>
-          <filter id={shadowId} x="-20%" y="-20%" width="140%" height="140%">
+          <filter id={shadowId} x="-50%" y="-50%" width="200%" height="200%">
             <feDropShadow
-              dx="2"
-              dy="2"
-              stdDeviation="2"
-              floodColor="rgba(0,0,0,0.1)"
+              dx={style.shadow.x}
+              dy={style.shadow.y}
+              stdDeviation={style.shadow.blur / 2}
+              floodColor={style.shadow.color}
             />
           </filter>
         </defs>
       )}
 
-      {/* Main rectangle */}
-      <rect
-        x={0}
-        y={0}
-        width={width}
-        height={height}
-        rx={style.borderRadius}
-        ry={style.borderRadius}
-        fill={fillColor}
-        stroke={selected ? "#2196F3" : strokeColor}
-        strokeWidth={selected ? 2 : style.strokeWidth}
-        filter={style.shadow ? `url(#${shadowId})` : undefined}
-      />
-
-      {/* Selection indicator */}
-      {selected && (
+      {/* Main shape */}
+      {shape === "cylinder" ? (
+        <CylinderShape
+          width={size.width}
+          height={size.height}
+          style={style}
+          shadowId={shadowId}
+        />
+      ) : shape === "diamond" ? (
+        <DiamondShape
+          width={size.width}
+          height={size.height}
+          style={style}
+          shadowId={shadowId}
+        />
+      ) : (
         <rect
-          x={-2}
-          y={-2}
-          width={width + 4}
-          height={height + 4}
-          rx={style.borderRadius + 2}
-          ry={style.borderRadius + 2}
-          fill="none"
-          stroke="#2196F3"
-          strokeWidth={1}
-          strokeDasharray="4,2"
+          x={0}
+          y={0}
+          width={size.width}
+          height={size.height}
+          rx={borderRadius}
+          ry={borderRadius}
+          fill={style.fill}
+          fillOpacity={style.fillOpacity}
+          stroke={style.stroke}
+          strokeWidth={style.strokeWidth}
+          strokeDasharray={style.strokeDasharray}
+          filter={style.shadow ? `url(#${shadowId})` : undefined}
         />
       )}
 
-      {/* Title text */}
+      {/* Title */}
       <text
         x={centerX}
         y={titleY}
         textAnchor="middle"
         dominantBaseline="middle"
-        fontFamily={titleFont}
-        fontSize={template.typography.titleSize}
-        fontWeight={template.typography.titleWeight}
-        fill={theme.colors.text}
+        fontFamily={titleStyle.fontFamily}
+        fontSize={titleStyle.fontSize}
+        fontWeight={getFontWeight(titleStyle.fontWeight)}
+        fill={titleStyle.color}
       >
-        {node.content.title}
+        {content.title}
       </text>
 
-      {/* Subtitle text */}
-      {node.content.subtitle && (
+      {/* Subtitle */}
+      {hasSubtitle && subtitleStyle && (
         <text
           x={centerX}
           y={subtitleY}
           textAnchor="middle"
           dominantBaseline="middle"
-          fontFamily={subtitleFont}
-          fontSize={template.typography.subtitleSize}
-          fontWeight={template.typography.subtitleWeight}
-          fill={theme.colors.textMuted}
+          fontFamily={subtitleStyle.fontFamily}
+          fontSize={subtitleStyle.fontSize}
+          fontWeight={getFontWeight(subtitleStyle.fontWeight)}
+          fill={subtitleStyle.color}
         >
-          {node.content.subtitle}
+          {content.subtitle}
         </text>
       )}
     </g>
   );
 }
 
-// Cylinder shape for database nodes
-export function CylinderNodeRenderer({
-  node,
-  template,
-  theme,
-  selected = false,
-  onSelect,
-  onDragStart,
-}: NodeRendererProps) {
-  const style = {
-    ...template.style,
-    ...node.styleOverrides,
-  };
-
-  const fillColor = resolveColor(style.fill, theme);
-  const strokeColor = resolveColor(style.stroke, theme);
-
-  const width = node.size?.width ?? style.width;
-  const height = node.size?.height ?? style.height;
-
-  const ellipseRy = 10; // Height of the ellipse curve
-
-  const centerX = width / 2;
-  const centerY = height / 2;
-
-  const titleFont = resolveFont(template.typography.titleFont, theme);
-  const subtitleFont = resolveFont(template.typography.subtitleFont, theme);
-
-  const shadowId = `shadow-cyl-${node.id}`;
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSelect?.(node.id);
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onDragStart?.(node.id, e);
-  };
+// Cylinder shape component
+function CylinderShape({
+  width,
+  height,
+  style,
+  shadowId,
+}: {
+  width: number;
+  height: number;
+  style: NodeElement["style"];
+  shadowId: string;
+}) {
+  const ellipseRy = Math.min(12, height * 0.15);
 
   return (
-    <g
-      transform={`translate(${node.position.x}, ${node.position.y})`}
-      onClick={handleClick}
-      onMouseDown={handleMouseDown}
-      style={{ cursor: "pointer" }}
-    >
-      {style.shadow && (
-        <defs>
-          <filter id={shadowId} x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow
-              dx="2"
-              dy="2"
-              stdDeviation="2"
-              floodColor="rgba(0,0,0,0.1)"
-            />
-          </filter>
-        </defs>
-      )}
-
-      {/* Cylinder body */}
+    <g filter={style.shadow ? `url(#${shadowId})` : undefined}>
+      {/* Body */}
       <path
         d={`
           M 0 ${ellipseRy}
@@ -218,52 +149,63 @@ export function CylinderNodeRenderer({
           L ${width} ${ellipseRy}
           A ${width / 2} ${ellipseRy} 0 0 0 0 ${ellipseRy}
         `}
-        fill={fillColor}
-        stroke={selected ? "#2196F3" : strokeColor}
-        strokeWidth={selected ? 2 : style.strokeWidth}
-        filter={style.shadow ? `url(#${shadowId})` : undefined}
+        fill={style.fill}
+        fillOpacity={style.fillOpacity}
+        stroke={style.stroke}
+        strokeWidth={style.strokeWidth}
       />
-
       {/* Top ellipse */}
       <ellipse
-        cx={centerX}
+        cx={width / 2}
         cy={ellipseRy}
         rx={width / 2}
         ry={ellipseRy}
-        fill={fillColor}
-        stroke={selected ? "#2196F3" : strokeColor}
-        strokeWidth={selected ? 2 : style.strokeWidth}
+        fill={style.fill}
+        fillOpacity={style.fillOpacity}
+        stroke={style.stroke}
+        strokeWidth={style.strokeWidth}
       />
-
-      {/* Title */}
-      <text
-        x={centerX}
-        y={centerY - 4}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fontFamily={titleFont}
-        fontSize={template.typography.titleSize}
-        fontWeight={template.typography.titleWeight}
-        fill={theme.colors.text}
-      >
-        {node.content.title}
-      </text>
-
-      {/* Subtitle */}
-      {node.content.subtitle && (
-        <text
-          x={centerX}
-          y={centerY + template.typography.titleSize + 2}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          fontFamily={subtitleFont}
-          fontSize={template.typography.subtitleSize}
-          fontWeight={template.typography.subtitleWeight}
-          fill={theme.colors.textMuted}
-        >
-          {node.content.subtitle}
-        </text>
-      )}
     </g>
   );
+}
+
+// Diamond shape component
+function DiamondShape({
+  width,
+  height,
+  style,
+  shadowId,
+}: {
+  width: number;
+  height: number;
+  style: NodeElement["style"];
+  shadowId: string;
+}) {
+  const points = `
+    ${width / 2},0
+    ${width},${height / 2}
+    ${width / 2},${height}
+    0,${height / 2}
+  `;
+
+  return (
+    <polygon
+      points={points}
+      fill={style.fill}
+      fillOpacity={style.fillOpacity}
+      stroke={style.stroke}
+      strokeWidth={style.strokeWidth}
+      filter={style.shadow ? `url(#${shadowId})` : undefined}
+    />
+  );
+}
+
+function getFontWeight(weight: string): number {
+  const weights: { [key: string]: number } = {
+    normal: 400,
+    medium: 500,
+    semibold: 600,
+    bold: 700,
+  };
+  return weights[weight] || 400;
 }

@@ -1,149 +1,257 @@
 "use client";
 
-import { DiagramEdge, DiagramNode, NodeTemplate, Theme } from "@/lib/schema/types";
-import { resolveColor } from "@/themes/academic";
-import {
-  getPortPosition,
-  determineBestPorts,
-  calculateOrthogonalPath,
-  calculateStraightPath,
-  calculateCurvedPath,
-  getLabelPosition,
-} from "@/lib/rendering/edges";
+import { EdgeElement, DiagramElement, NodeElement, ContainerElement } from "@/lib/schema/types";
 
 interface EdgeRendererProps {
-  edge: DiagramEdge;
-  sourceNode: DiagramNode;
-  sourceTemplate: NodeTemplate;
-  targetNode: DiagramNode;
-  targetTemplate: NodeTemplate;
-  theme: Theme;
-  selected?: boolean;
-  onSelect?: (edgeId: string) => void;
+  element: EdgeElement;
+  elements: DiagramElement[];
+  isSelected: boolean;
+  onMouseDown: (e: React.MouseEvent) => void;
 }
 
-export function EdgeRenderer({
-  edge,
-  sourceNode,
-  sourceTemplate,
-  targetNode,
-  targetTemplate,
-  theme,
-  selected = false,
-  onSelect,
-}: EdgeRendererProps) {
-  // Resolve colors
-  const strokeColor = resolveColor(edge.style.stroke, theme);
+export function EdgeRenderer({ element, elements, isSelected, onMouseDown }: EdgeRendererProps) {
+  const { source, target, style, routing, label, startArrow, endArrow } = element;
 
-  // Determine ports
-  const { sourcePort, targetPort } =
-    edge.source.port && edge.target.port
-      ? { sourcePort: edge.source.port, targetPort: edge.target.port }
-      : determineBestPorts(sourceNode, sourceTemplate, targetNode, targetTemplate);
+  // Find source and target elements
+  const sourceEl = elements.find((e) => e.id === source.elementId) as NodeElement | ContainerElement | undefined;
+  const targetEl = elements.find((e) => e.id === target.elementId) as NodeElement | ContainerElement | undefined;
+
+  if (!sourceEl || !targetEl) return null;
 
   // Get connection points
-  const sourcePoint = getPortPosition(sourceNode, sourceTemplate, sourcePort);
-  const targetPoint = getPortPosition(targetNode, targetTemplate, targetPort);
+  const sourcePoint = getConnectionPoint(sourceEl, source.anchor, targetEl);
+  const targetPoint = getConnectionPoint(targetEl, target.anchor, sourceEl);
 
-  // Calculate path based on routing type
-  let pathD: string;
-  switch (edge.routing) {
-    case "straight":
-      pathD = calculateStraightPath(sourcePoint, targetPoint);
-      break;
-    case "curved":
-      pathD = calculateCurvedPath(sourcePoint, sourcePort, targetPoint, targetPort);
-      break;
-    case "orthogonal":
-    default:
-      pathD = calculateOrthogonalPath(sourcePoint, sourcePort, targetPoint, targetPort);
-      break;
-  }
+  // Calculate path
+  const path = calculatePath(sourcePoint, targetPoint, source.anchor, target.anchor, routing);
 
-  // Arrow marker ID
-  const markerId = `arrow-${edge.id}`;
-
-  // Label position
-  const labelPos = edge.label ? getLabelPosition(pathD, edge.label.position) : null;
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onSelect?.(edge.id);
-  };
+  // Marker IDs
+  const startMarkerId = `arrow-start-${element.id}`;
+  const endMarkerId = `arrow-end-${element.id}`;
 
   return (
-    <g onClick={handleClick}>
-      {/* Arrow marker definition */}
-      {edge.arrow.end && (
-        <defs>
+    <g onMouseDown={onMouseDown} style={{ cursor: "pointer" }}>
+      {/* Arrow markers */}
+      <defs>
+        {startArrow && (
           <marker
-            id={markerId}
-            markerWidth="10"
-            markerHeight="10"
-            refX="9"
-            refY="3"
-            orient="auto"
-            markerUnits="strokeWidth"
+            id={startMarkerId}
+            markerWidth={startArrow.size}
+            markerHeight={startArrow.size}
+            refX={startArrow.type === "filled" ? 0 : 0}
+            refY={startArrow.size / 2}
+            orient="auto-start-reverse"
           >
-            {edge.arrow.type === "filled" ? (
-              <path d="M0,0 L0,6 L9,3 z" fill={strokeColor} />
-            ) : (
-              <path
-                d="M0,0 L9,3 L0,6"
-                fill="none"
-                stroke={strokeColor}
-                strokeWidth="1"
-              />
-            )}
+            <ArrowHead type={startArrow.type} size={startArrow.size} color={style.stroke} />
           </marker>
-        </defs>
-      )}
+        )}
+        {endArrow && (
+          <marker
+            id={endMarkerId}
+            markerWidth={endArrow.size}
+            markerHeight={endArrow.size}
+            refX={endArrow.type === "filled" ? endArrow.size : endArrow.size}
+            refY={endArrow.size / 2}
+            orient="auto"
+          >
+            <ArrowHead type={endArrow.type} size={endArrow.size} color={style.stroke} />
+          </marker>
+        )}
+      </defs>
 
-      {/* Invisible hit area for easier selection */}
+      {/* Hit area for easier selection */}
       <path
-        d={pathD}
+        d={path}
         fill="none"
         stroke="transparent"
         strokeWidth={12}
-        style={{ cursor: "pointer" }}
       />
 
-      {/* Main edge path */}
+      {/* Actual edge */}
       <path
-        d={pathD}
+        d={path}
         fill="none"
-        stroke={selected ? "#2196F3" : strokeColor}
-        strokeWidth={selected ? edge.style.strokeWidth + 1 : edge.style.strokeWidth}
-        strokeDasharray={edge.style.strokeDasharray}
-        markerEnd={edge.arrow.end ? `url(#${markerId})` : undefined}
-        markerStart={edge.arrow.start ? `url(#${markerId}-start)` : undefined}
-        style={{ cursor: "pointer" }}
+        stroke={isSelected ? "#2563eb" : style.stroke}
+        strokeWidth={style.strokeWidth}
+        strokeDasharray={style.strokeDasharray}
+        strokeOpacity={style.opacity}
+        markerStart={startArrow ? `url(#${startMarkerId})` : undefined}
+        markerEnd={endArrow ? `url(#${endMarkerId})` : undefined}
       />
 
-      {/* Edge label */}
-      {edge.label && labelPos && (
-        <g transform={`translate(${labelPos.x}, ${labelPos.y})`}>
-          {/* Background for label */}
-          <rect
-            x={-edge.label.text.length * 3.5}
-            y={-8}
-            width={edge.label.text.length * 7}
-            height={16}
-            fill={theme.colors.background}
-            rx={2}
-          />
-          <text
-            textAnchor="middle"
-            dominantBaseline="middle"
-            fontFamily={theme.typography.sansFont}
-            fontSize={10}
-            fill={theme.colors.textMuted}
-            fontStyle="italic"
-          >
-            {edge.label.text}
-          </text>
-        </g>
+      {/* Label */}
+      {label && (
+        <EdgeLabel
+          path={path}
+          label={label}
+          position={label.position}
+        />
       )}
     </g>
   );
+}
+
+function ArrowHead({ type, size, color }: { type: string; size: number; color: string }) {
+  switch (type) {
+    case "filled":
+      return <path d={`M0,0 L${size},${size / 2} L0,${size} Z`} fill={color} />;
+    case "open":
+      return (
+        <path
+          d={`M0,0 L${size},${size / 2} L0,${size}`}
+          fill="none"
+          stroke={color}
+          strokeWidth={1.5}
+        />
+      );
+    case "diamond":
+      return (
+        <path
+          d={`M0,${size / 2} L${size / 2},0 L${size},${size / 2} L${size / 2},${size} Z`}
+          fill={color}
+        />
+      );
+    case "circle":
+      return <circle cx={size / 2} cy={size / 2} r={size / 3} fill={color} />;
+    default:
+      return null;
+  }
+}
+
+function EdgeLabel({ path, label, position }: { path: string; label: EdgeElement["label"]; position: number }) {
+  if (!label) return null;
+
+  // Simple midpoint calculation (could be improved with proper path interpolation)
+  const match = path.match(/M\s*([\d.]+)[,\s]*([\d.]+)/);
+  const endMatch = path.match(/L\s*([\d.]+)[,\s]*([\d.]+)(?!.*L)/);
+
+  if (!match || !endMatch) return null;
+
+  const x1 = parseFloat(match[1]);
+  const y1 = parseFloat(match[2]);
+  const x2 = parseFloat(endMatch[1]);
+  const y2 = parseFloat(endMatch[2]);
+
+  const x = x1 + (x2 - x1) * position;
+  const y = y1 + (y2 - y1) * position;
+
+  return (
+    <g transform={`translate(${x}, ${y})`}>
+      {label.background && (
+        <rect
+          x={-label.text.length * 3.5 - (label.padding || 4)}
+          y={-10}
+          width={label.text.length * 7 + (label.padding || 4) * 2}
+          height={20}
+          rx={2}
+          fill={label.background}
+        />
+      )}
+      <text
+        textAnchor="middle"
+        dominantBaseline="middle"
+        fontFamily={label.style.fontFamily}
+        fontSize={label.style.fontSize}
+        fill={label.style.color}
+        fontStyle="italic"
+      >
+        {label.text}
+      </text>
+    </g>
+  );
+}
+
+function getConnectionPoint(
+  element: NodeElement | ContainerElement,
+  anchor: string,
+  otherElement: NodeElement | ContainerElement
+): { x: number; y: number } {
+  const { position, size } = element;
+  const centerX = position.x + size.width / 2;
+  const centerY = position.y + size.height / 2;
+
+  if (anchor === "auto") {
+    // Determine best anchor based on relative position
+    const otherCenterX = otherElement.position.x + otherElement.size.width / 2;
+    const otherCenterY = otherElement.position.y + otherElement.size.height / 2;
+
+    const dx = otherCenterX - centerX;
+    const dy = otherCenterY - centerY;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      anchor = dx > 0 ? "right" : "left";
+    } else {
+      anchor = dy > 0 ? "bottom" : "top";
+    }
+  }
+
+  switch (anchor) {
+    case "top":
+      return { x: centerX, y: position.y };
+    case "bottom":
+      return { x: centerX, y: position.y + size.height };
+    case "left":
+      return { x: position.x, y: centerY };
+    case "right":
+      return { x: position.x + size.width, y: centerY };
+    case "center":
+    default:
+      return { x: centerX, y: centerY };
+  }
+}
+
+function calculatePath(
+  source: { x: number; y: number },
+  target: { x: number; y: number },
+  sourceAnchor: string,
+  targetAnchor: string,
+  routing: string
+): string {
+  if (routing === "straight") {
+    return `M ${source.x} ${source.y} L ${target.x} ${target.y}`;
+  }
+
+  if (routing === "curved") {
+    const dx = target.x - source.x;
+    const cx1 = source.x + dx * 0.5;
+    const cy1 = source.y;
+    const cx2 = source.x + dx * 0.5;
+    const cy2 = target.y;
+    return `M ${source.x} ${source.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${target.x} ${target.y}`;
+  }
+
+  // Orthogonal routing
+  const padding = 20;
+  const isSourceHorizontal = sourceAnchor === "left" || sourceAnchor === "right";
+  const isTargetHorizontal = targetAnchor === "left" || targetAnchor === "right";
+
+  // Offset from anchors
+  const sourceOffset = isSourceHorizontal
+    ? { x: sourceAnchor === "right" ? padding : -padding, y: 0 }
+    : { x: 0, y: sourceAnchor === "bottom" ? padding : -padding };
+  const targetOffset = isTargetHorizontal
+    ? { x: targetAnchor === "right" ? padding : -padding, y: 0 }
+    : { x: 0, y: targetAnchor === "bottom" ? padding : -padding };
+
+  const p1 = { x: source.x + sourceOffset.x, y: source.y + sourceOffset.y };
+  const p2 = { x: target.x + targetOffset.x, y: target.y + targetOffset.y };
+
+  // Build path with right angles
+  let path = `M ${source.x} ${source.y} L ${p1.x} ${p1.y}`;
+
+  if (isSourceHorizontal && isTargetHorizontal) {
+    const midX = (p1.x + p2.x) / 2;
+    path += ` L ${midX} ${p1.y} L ${midX} ${p2.y}`;
+  } else if (!isSourceHorizontal && !isTargetHorizontal) {
+    const midY = (p1.y + p2.y) / 2;
+    path += ` L ${p1.x} ${midY} L ${p2.x} ${midY}`;
+  } else if (isSourceHorizontal) {
+    path += ` L ${p2.x} ${p1.y}`;
+  } else {
+    path += ` L ${p1.x} ${p2.y}`;
+  }
+
+  path += ` L ${p2.x} ${p2.y} L ${target.x} ${target.y}`;
+
+  return path;
 }
