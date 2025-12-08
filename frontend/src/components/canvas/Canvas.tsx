@@ -267,7 +267,8 @@ export function Canvas() {
       if (isConnecting && connectionStart) {
         // Check if we're over an element to connect to
         const canvasPos = screenToCanvas(e.clientX, e.clientY);
-        const targetElement = diagram.elements.find((el) => {
+        // Find all elements under the cursor
+        const elementsUnderCursor = diagram.elements.filter((el) => {
           if (el.type === "edge" || el.id === connectionStart.elementId) return false;
           return (
             canvasPos.x >= el.position.x &&
@@ -276,6 +277,9 @@ export function Canvas() {
             canvasPos.y <= el.position.y + el.size.height
           );
         });
+        // Prioritize nodes/text over containers (nodes are rendered on top)
+        const targetElement = elementsUnderCursor.find((el) => el.type === "node" || el.type === "text")
+          || elementsUnderCursor.find((el) => el.type === "container");
 
         if (targetElement) {
           // Determine target anchor based on where we dropped
