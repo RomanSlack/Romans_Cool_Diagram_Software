@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Canvas } from "@/components/canvas/Canvas";
 import { FloatingToolbar } from "@/components/editor/FloatingToolbar";
 import { Inspector } from "@/components/editor/Inspector";
 import { LeftSidebar } from "@/components/editor/LeftSidebar";
+import { LoadingScreen } from "@/components/ui/LoadingScreen";
+import { BuyMeCoffee } from "@/components/ui/BuyMeCoffee";
 import { useDiagramStore } from "@/lib/store/diagramStore";
 import { createNode, createContainer, createEdge, createText } from "@/lib/schema/types";
 
 export default function Home() {
   const { setDiagram, diagram } = useDiagramStore();
   const initialized = useRef(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Initialize with a sample diagram on first load
   useEffect(() => {
@@ -195,19 +198,35 @@ export default function Home() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return (
-    <div className="h-screen flex bg-gray-100 overflow-hidden">
-      {/* Left Sidebar */}
-      <LeftSidebar />
+  // Hide loading screen after initial render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, []);
 
-      {/* Canvas area */}
-      <div className="flex-1 relative overflow-hidden">
-        <Canvas />
-        <FloatingToolbar />
+  return (
+    <>
+      {/* Loading Screen */}
+      {isLoading && <LoadingScreen />}
+
+      <div className={`h-screen flex bg-gray-100 overflow-hidden transition-opacity duration-300 ${isLoading ? "opacity-0" : "opacity-100"}`}>
+        {/* Left Sidebar */}
+        <LeftSidebar />
+
+        {/* Canvas area */}
+        <div className="flex-1 relative overflow-hidden">
+          <Canvas />
+          <FloatingToolbar />
+        </div>
+
+        {/* Inspector */}
+        <Inspector />
       </div>
 
-      {/* Inspector */}
-      <Inspector />
-    </div>
+      {/* Buy Me a Coffee */}
+      {!isLoading && <BuyMeCoffee />}
+    </>
   );
 }

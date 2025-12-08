@@ -46,6 +46,12 @@ export function FloatingToolbar() {
   const canRedo = historyIndex < history.length - 1;
   const hasSelection = selectedIds.length > 0;
 
+  // Handle drag start for element creation
+  const handleDragStart = (e: React.DragEvent, elementType: "node" | "text" | "container") => {
+    e.dataTransfer.setData("elementType", elementType);
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 animate-slide-up">
       <div
@@ -76,17 +82,29 @@ export function FloatingToolbar() {
 
         <Divider />
 
-        {/* Add tools */}
+        {/* Add tools - draggable */}
         <ToolGroup>
-          <ToolButton onClick={() => addNode()} tooltip="Add Node (N)">
+          <DraggableToolButton
+            onClick={() => addNode()}
+            onDragStart={(e) => handleDragStart(e, "node")}
+            tooltip="Add Node (N) - Click or drag"
+          >
             <Square size={18} />
-          </ToolButton>
-          <ToolButton onClick={() => addText()} tooltip="Add Text (T)">
+          </DraggableToolButton>
+          <DraggableToolButton
+            onClick={() => addText()}
+            onDragStart={(e) => handleDragStart(e, "text")}
+            tooltip="Add Text (T) - Click or drag"
+          >
             <Type size={18} />
-          </ToolButton>
-          <ToolButton onClick={() => addContainer()} tooltip="Add Container (C)">
+          </DraggableToolButton>
+          <DraggableToolButton
+            onClick={() => addContainer()}
+            onDragStart={(e) => handleDragStart(e, "container")}
+            tooltip="Add Container (C) - Click or drag"
+          >
             <SquareDashed size={18} />
-          </ToolButton>
+          </DraggableToolButton>
         </ToolGroup>
 
         <Divider />
@@ -204,6 +222,41 @@ function ToolButton({ onClick, disabled, active, tooltip, danger, children }: To
   );
 
   if (tooltip && !disabled) {
+    return (
+      <Tooltip content={tooltip} position="top">
+        {button}
+      </Tooltip>
+    );
+  }
+
+  return button;
+}
+
+interface DraggableToolButtonProps {
+  onClick: () => void;
+  onDragStart: (e: React.DragEvent) => void;
+  tooltip?: string;
+  children: React.ReactNode;
+}
+
+function DraggableToolButton({ onClick, onDragStart, tooltip, children }: DraggableToolButtonProps) {
+  const button = (
+    <button
+      onClick={onClick}
+      draggable
+      onDragStart={onDragStart}
+      className="
+        w-9 h-9 flex items-center justify-center rounded-lg
+        transition-all duration-100
+        text-gray-500 hover:bg-gray-100 hover:text-gray-700
+        cursor-grab active:cursor-grabbing active:scale-95
+      "
+    >
+      {children}
+    </button>
+  );
+
+  if (tooltip) {
     return (
       <Tooltip content={tooltip} position="top">
         {button}

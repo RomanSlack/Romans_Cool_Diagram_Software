@@ -1,9 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useDiagramStore } from "@/lib/store/diagramStore";
+import { useProjectsStore } from "@/lib/store/projectsStore";
 import { Tooltip } from "@/components/ui/Tooltip";
+import { ProjectSpotlight } from "@/components/ui/ProjectSpotlight";
+import { SettingsModal } from "@/components/ui/SettingsModal";
 import {
   FolderOpen,
   FilePlus,
@@ -20,19 +23,64 @@ import {
   Type,
   Square,
   ArrowRight,
+  Command,
+  Check,
   type LucideIcon,
 } from "lucide-react";
 
 export function LeftSidebar() {
   const { diagram, setDiagram } = useDiagramStore();
+  const { saveProject } = useProjectsStore();
+
   const [projectMenuOpen, setProjectMenuOpen] = useState(false);
   const [elementsOpen, setElementsOpen] = useState(true);
+  const [spotlightOpen, setSpotlightOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   const elements = diagram.elements;
   const nodes = elements.filter((e) => e.type === "node");
   const edges = elements.filter((e) => e.type === "edge");
   const texts = elements.filter((e) => e.type === "text");
   const containers = elements.filter((e) => e.type === "container");
+
+  // Auto-save every 30 seconds when changes occur
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (diagram.elements.length > 0) {
+        saveProject(diagram);
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [diagram, saveProject]);
+
+  const handleSaveToBrowser = useCallback(() => {
+    setSaveStatus("saving");
+    saveProject(diagram);
+    setTimeout(() => {
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    }, 300);
+  }, [diagram, saveProject]);
+
+  // Keyboard shortcut for spotlight (Cmd/Ctrl + K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSpotlightOpen(true);
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        handleSaveToBrowser();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleSaveToBrowser]);
 
   const handleExportPNG = async () => {
     const { toPng } = await import("html-to-image");
@@ -80,6 +128,7 @@ export function LeftSidebar() {
         try {
           const imported = JSON.parse(text);
           setDiagram(imported);
+          saveProject(imported);
         } catch {
           alert("Invalid JSON file");
         }
@@ -89,168 +138,205 @@ export function LeftSidebar() {
   };
 
   const handleNewProject = () => {
-    if (confirm("Create a new project? Unsaved changes will be lost.")) {
-      setDiagram({
-        id: crypto.randomUUID(),
-        name: "Untitled Diagram",
-        version: "1.0",
-        canvas: {
-          width: 1200,
-          height: 800,
-          background: "#ffffff",
-          gridSize: 20,
-          snapToGrid: false,
-          showGrid: false,
-        },
-        elements: [],
-      });
+    if (diagram.elements.length > 0) {
+      saveProject(diagram);
     }
+    setDiagram({
+      id: crypto.randomUUID(),
+      name: "Untitled Diagram",
+      version: "1.0",
+      canvas: {
+        width: 1200,
+        height: 800,
+        background: "#ffffff",
+        gridSize: 20,
+        snapToGrid: false,
+        showGrid: false,
+      },
+      elements: [],
+    });
   };
 
   return (
-    <div className="w-56 bg-white border-r border-gray-200 flex flex-col h-full animate-fade-in">
-      {/* Project Header */}
-      <div className="p-3 border-b border-gray-200">
-        <div className="flex items-center gap-2.5 mb-3">
-          <Image
-            src="/logo.png"
-            alt="RCDS Logo"
-            width={32}
-            height={32}
-            className="rounded-lg"
-          />
-          <div className="flex-1 min-w-0">
-            <h1 className="text-sm font-semibold text-gray-900">RCDS</h1>
-            <Tooltip content={diagram.name} position="bottom">
-              <p className="text-xs text-gray-500 truncate max-w-[140px]">
-                {diagram.name}
+    <>
+      <div className="w-56 bg-white border-r border-gray-200 flex flex-col h-full animate-fade-in">
+        {/* Project Header */}
+        <div className="p-3 border-b border-gray-200">
+          <div className="flex items-center gap-2.5 mb-3">
+            <Image
+              src="/logo.png"
+              alt="RCDS Logo"
+              width={32}
+              height={32}
+              className="rounded-lg"
+            />
+            <div className="flex-1 min-w-0">
+              <h1 className="text-sm font-semibold text-gray-900">RCDS</h1>
+              <Tooltip content={diagram.name} position="bottom">
+                <p className="text-xs text-gray-500 truncate max-w-[140px]">
+                  {diagram.name}
+                </p>
+              </Tooltip>
+            </div>
+          </div>
+
+          {/* Open Project (Spotlight trigger) */}
+          <button
+            onClick={() => setSpotlightOpen(true)}
+            className="
+              w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium
+              rounded-lg transition-all duration-150
+              text-gray-700 bg-gray-50 hover:bg-gray-100
+              border border-gray-200 hover:border-gray-300
+            "
+          >
+            <span className="flex items-center gap-2">
+              <FolderOpen size={14} />
+              Open Project
+            </span>
+            <span className="flex items-center gap-1 text-gray-400">
+              <Command size={10} />
+              <span>K</span>
+            </span>
+          </button>
+
+          {/* Project Menu Toggle */}
+          <button
+            onClick={() => setProjectMenuOpen(!projectMenuOpen)}
+            className={`
+              w-full flex items-center justify-between px-2.5 py-2 mt-2 text-xs font-medium
+              rounded-lg transition-all duration-150
+              ${projectMenuOpen
+                ? "bg-gray-100 text-gray-900"
+                : "text-gray-600 hover:bg-gray-50"
+              }
+            `}
+          >
+            <span className="flex items-center gap-2">
+              <FileText size={14} />
+              File Options
+            </span>
+            <ChevronDown
+              size={14}
+              className={`transition-transform duration-200 ${projectMenuOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+
+          {/* Project Menu Dropdown */}
+          <div
+            className={`
+              overflow-hidden transition-all duration-200 ease-out
+              ${projectMenuOpen ? "max-h-96 opacity-100 mt-2" : "max-h-0 opacity-0"}
+            `}
+          >
+            <div className="space-y-0.5">
+              <MenuItem icon={FilePlus} label="New Project" onClick={handleNewProject} />
+              <MenuItem icon={Upload} label="Import JSON" onClick={handleImportJSON} />
+              <MenuItem
+                icon={saveStatus === "saved" ? Check : Save}
+                label={saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved!" : "Save to Browser"}
+                onClick={handleSaveToBrowser}
+                shortcut="⌘S"
+              />
+              <div className="border-t border-gray-100 my-1.5" />
+              <p className="px-2.5 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+                Export
               </p>
-            </Tooltip>
+              <MenuItem icon={ImageIcon} label="Export PNG" onClick={handleExportPNG} />
+              <MenuItem icon={FileCode} label="Export SVG" onClick={handleExportSVG} />
+              <MenuItem icon={FileText} label="Export JSON" onClick={handleExportJSON} />
+            </div>
           </div>
         </div>
 
-        {/* Project Menu Toggle */}
-        <button
-          onClick={() => setProjectMenuOpen(!projectMenuOpen)}
-          className={`
-            w-full flex items-center justify-between px-2.5 py-2 text-xs font-medium
-            rounded-lg transition-all duration-150
-            ${projectMenuOpen
-              ? "bg-gray-100 text-gray-900"
-              : "text-gray-700 bg-gray-50 hover:bg-gray-100"
-            }
-          `}
-        >
-          <span className="flex items-center gap-2">
-            <FolderOpen size={14} />
-            Project
-          </span>
-          <ChevronDown
-            size={14}
-            className={`transition-transform duration-200 ${projectMenuOpen ? "rotate-180" : ""}`}
-          />
-        </button>
+        {/* Elements Panel */}
+        <div className="flex-1 overflow-auto">
+          <button
+            onClick={() => setElementsOpen(!elementsOpen)}
+            className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Layers size={14} />
+              Elements
+            </span>
+            <ChevronDown
+              size={14}
+              className={`transition-transform duration-200 ${elementsOpen ? "rotate-180" : ""}`}
+            />
+          </button>
 
-        {/* Project Menu Dropdown */}
-        <div
-          className={`
-            overflow-hidden transition-all duration-200 ease-out
-            ${projectMenuOpen ? "max-h-96 opacity-100 mt-2" : "max-h-0 opacity-0"}
-          `}
-        >
-          <div className="space-y-0.5">
-            <MenuItem icon={FilePlus} label="New Project" onClick={handleNewProject} />
-            <MenuItem icon={Upload} label="Import JSON" onClick={handleImportJSON} />
-            <MenuItem icon={Save} label="Save to Browser" onClick={() => {}} disabled />
-            <div className="border-t border-gray-100 my-1.5" />
-            <p className="px-2.5 py-1 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-              Export
-            </p>
-            <MenuItem icon={ImageIcon} label="Export PNG" onClick={handleExportPNG} />
-            <MenuItem icon={FileCode} label="Export SVG" onClick={handleExportSVG} />
-            <MenuItem icon={FileText} label="Export JSON" onClick={handleExportJSON} />
+          <div
+            className={`
+              overflow-hidden transition-all duration-200 ease-out
+              ${elementsOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"}
+            `}
+          >
+            <div className="px-2 pb-2">
+              {containers.length > 0 && (
+                <ElementGroup
+                  icon={Square}
+                  label="Containers"
+                  count={containers.length}
+                  elements={containers}
+                />
+              )}
+
+              {nodes.length > 0 && (
+                <ElementGroup
+                  icon={Box}
+                  label="Nodes"
+                  count={nodes.length}
+                  elements={nodes}
+                />
+              )}
+
+              {texts.length > 0 && (
+                <ElementGroup
+                  icon={Type}
+                  label="Text"
+                  count={texts.length}
+                  elements={texts}
+                />
+              )}
+
+              {edges.length > 0 && (
+                <ElementGroup
+                  icon={ArrowRight}
+                  label="Connections"
+                  count={edges.length}
+                  elements={edges}
+                />
+              )}
+
+              {elements.length === 0 && (
+                <p className="px-2 py-6 text-xs text-gray-400 text-center">
+                  No elements yet.
+                  <br />
+                  <span className="text-gray-300">Use the toolbar to add elements.</span>
+                </p>
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-2 border-t border-gray-200">
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className="w-full flex items-center gap-2 px-2.5 py-2 text-xs text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+          >
+            <Settings size={14} />
+            Settings
+          </button>
         </div>
       </div>
 
-      {/* Elements Panel */}
-      <div className="flex-1 overflow-auto">
-        <button
-          onClick={() => setElementsOpen(!elementsOpen)}
-          className="w-full flex items-center justify-between px-3 py-2.5 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-        >
-          <span className="flex items-center gap-2">
-            <Layers size={14} />
-            Elements
-          </span>
-          <ChevronDown
-            size={14}
-            className={`transition-transform duration-200 ${elementsOpen ? "rotate-180" : ""}`}
-          />
-        </button>
+      {/* Spotlight Modal */}
+      <ProjectSpotlight isOpen={spotlightOpen} onClose={() => setSpotlightOpen(false)} />
 
-        <div
-          className={`
-            overflow-hidden transition-all duration-200 ease-out
-            ${elementsOpen ? "max-h-[1000px] opacity-100" : "max-h-0 opacity-0"}
-          `}
-        >
-          <div className="px-2 pb-2">
-            {containers.length > 0 && (
-              <ElementGroup
-                icon={Square}
-                label="Containers"
-                count={containers.length}
-                elements={containers}
-              />
-            )}
-
-            {nodes.length > 0 && (
-              <ElementGroup
-                icon={Box}
-                label="Nodes"
-                count={nodes.length}
-                elements={nodes}
-              />
-            )}
-
-            {texts.length > 0 && (
-              <ElementGroup
-                icon={Type}
-                label="Text"
-                count={texts.length}
-                elements={texts}
-              />
-            )}
-
-            {edges.length > 0 && (
-              <ElementGroup
-                icon={ArrowRight}
-                label="Connections"
-                count={edges.length}
-                elements={edges}
-              />
-            )}
-
-            {elements.length === 0 && (
-              <p className="px-2 py-6 text-xs text-gray-400 text-center">
-                No elements yet.
-                <br />
-                <span className="text-gray-300">Use the toolbar to add elements.</span>
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="p-2 border-t border-gray-200">
-        <button className="w-full flex items-center gap-2 px-2.5 py-2 text-xs text-gray-600 hover:bg-gray-50 rounded-lg transition-colors">
-          <Settings size={14} />
-          Settings
-        </button>
-      </div>
-    </div>
+      {/* Settings Modal */}
+      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    </>
   );
 }
 
@@ -258,28 +344,29 @@ function MenuItem({
   icon: Icon,
   label,
   onClick,
-  disabled,
+  shortcut,
 }: {
   icon: LucideIcon;
   label: string;
   onClick: () => void;
-  disabled?: boolean;
+  shortcut?: string;
 }) {
   return (
     <button
       onClick={onClick}
-      disabled={disabled}
-      className={`
-        w-full flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-md
+      className="
+        w-full flex items-center justify-between gap-2 px-2.5 py-1.5 text-xs rounded-md
         transition-all duration-150
-        ${disabled
-          ? "text-gray-300 cursor-not-allowed"
-          : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 active:scale-[0.98]"
-        }
-      `}
+        text-gray-600 hover:bg-gray-100 hover:text-gray-900 active:scale-[0.98]
+      "
     >
-      <Icon size={14} />
-      {label}
+      <span className="flex items-center gap-2">
+        <Icon size={14} />
+        {label}
+      </span>
+      {shortcut && (
+        <span className="text-[10px] text-gray-400">{shortcut}</span>
+      )}
     </button>
   );
 }

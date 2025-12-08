@@ -46,6 +46,11 @@ export function Canvas() {
   const [connectionEnd, setConnectionEnd] = useState<{ x: number; y: number } | null>(null);
   const [hoveredElement, setHoveredElement] = useState<string | null>(null);
 
+  // Marquee selection state
+  const [isMarqueeSelecting, setIsMarqueeSelecting] = useState(false);
+  const [marqueeStart, setMarqueeStart] = useState({ x: 0, y: 0 });
+  const [marqueeEnd, setMarqueeEnd] = useState({ x: 0, y: 0 });
+
   // Convert screen coords to canvas coords
   const screenToCanvas = useCallback(
     (screenX: number, screenY: number) => {
@@ -147,19 +152,38 @@ export function Canvas() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedIds, deleteElements, copy, paste, undo, redo, select, clearSelection, diagram.elements, setActiveTool]);
 
-  // Mouse down on canvas (for panning or selection)
+  // Mouse down on canvas (for panning or marquee selection)
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      // Prevent text selection
+      e.preventDefault();
+
       if (e.button === 1 || (e.button === 0 && e.altKey)) {
         // Middle mouse or alt+left = pan
         setIsPanning(true);
         setDragStart({ x: e.clientX - viewport.x, y: e.clientY - viewport.y });
-      } else if (e.target === svgRef.current || e.target === containerRef.current) {
-        // Click on empty canvas = clear selection
-        clearSelection();
+      } else if (e.button === 0 && activeTool === "select") {
+        // Check if clicking on empty canvas (SVG background or grid)
+        const target = e.target as Element;
+        const isEmptyCanvas = target === svgRef.current ||
+                              target === containerRef.current ||
+                              target.tagName === "rect" && target.getAttribute("fill")?.includes("url(#grid)");
+
+        if (isEmptyCanvas) {
+          // Start marquee selection
+          const canvasPos = screenToCanvas(e.clientX, e.clientY);
+          setIsMarqueeSelecting(true);
+          setMarqueeStart(canvasPos);
+          setMarqueeEnd(canvasPos);
+
+          // Clear selection unless shift is held
+          if (!e.shiftKey) {
+            clearSelection();
+          }
+        }
       }
     },
-    [viewport, clearSelection]
+    [viewport, clearSelection, activeTool, screenToCanvas]
   );
 
   // Mouse move
@@ -170,6 +194,10 @@ export function Canvas() {
           x: e.clientX - dragStart.x,
           y: e.clientY - dragStart.y,
         });
+      } else if (isMarqueeSelecting) {
+        // Update marquee end position
+        const canvasPos = screenToCanvas(e.clientX, e.clientY);
+        setMarqueeEnd(canvasPos);
       } else if (isConnecting && connectionStart) {
         // Update connection preview
         const canvasPos = screenToCanvas(e.clientX, e.clientY);
@@ -197,12 +225,45 @@ export function Canvas() {
         });
       }
     },
-    [isPanning, isDragging, isConnecting, connectionStart, dragStart, selectedIds, dragElementStart, screenToCanvas, setViewport, updateElement, diagram.canvas]
+    [isPanning, isDragging, isConnecting, isMarqueeSelecting, connectionStart, dragStart, selectedIds, dragElementStart, screenToCanvas, setViewport, updateElement, diagram.canvas]
   );
 
   // Mouse up
   const handleMouseUp = useCallback(
     (e: React.MouseEvent) => {
+      if (isMarqueeSelecting) {
+        // Calculate marquee bounds
+        const minX = Math.min(marqueeStart.x, marqueeEnd.x);
+        const maxX = Math.max(marqueeStart.x, marqueeEnd.x);
+        const minY = Math.min(marqueeStart.y, marqueeEnd.y);
+        const maxY = Math.max(marqueeStart.y, marqueeEnd.y);
+
+        // Find elements within marquee
+        const elementsInMarquee = diagram.elements.filter((el) => {
+          if (el.type === "edge") return false;
+          // Check if element overlaps with marquee
+          return (
+            el.position.x < maxX &&
+            el.position.x + el.size.width > minX &&
+            el.position.y < maxY &&
+            el.position.y + el.size.height > minY
+          );
+        });
+
+        if (elementsInMarquee.length > 0) {
+          const newSelectedIds = elementsInMarquee.map((el) => el.id);
+          // If shift is held, add to existing selection
+          if (e.shiftKey) {
+            const combined = Array.from(new Set([...selectedIds, ...newSelectedIds]));
+            select(combined);
+          } else {
+            select(newSelectedIds);
+          }
+        }
+
+        setIsMarqueeSelecting(false);
+      }
+
       if (isConnecting && connectionStart) {
         // Check if we're over an element to connect to
         const canvasPos = screenToCanvas(e.clientX, e.clientY);
@@ -241,7 +302,7 @@ export function Canvas() {
       setIsDragging(false);
       setIsPanning(false);
     },
-    [isConnecting, connectionStart, isDragging, pushHistory, screenToCanvas, diagram.elements, addEdge]
+    [isConnecting, connectionStart, isDragging, isMarqueeSelecting, marqueeStart, marqueeEnd, pushHistory, screenToCanvas, diagram.elements, addEdge, select, selectedIds]
   );
 
   // Start connection from handle
@@ -257,6 +318,7 @@ export function Canvas() {
   const handleElementMouseDown = useCallback(
     (e: React.MouseEvent, element: DiagramElement) => {
       e.stopPropagation();
+      e.preventDefault(); // Prevent text selection
 
       // If in connect mode, start connection
       if (activeTool === "connect" && element.type !== "edge") {
@@ -265,8 +327,13 @@ export function Canvas() {
       }
 
       if (e.shiftKey) {
+        // Shift+click: toggle selection without starting drag
         selectAdd(element.id);
-      } else if (!selectedIds.includes(element.id)) {
+        return;
+      }
+
+      // Select this element if not already selected
+      if (!selectedIds.includes(element.id)) {
         select([element.id]);
       }
 
@@ -287,10 +354,6 @@ export function Canvas() {
         }
       });
       setDragElementStart(starts);
-
-      if (!selectedIds.includes(element.id)) {
-        select([element.id]);
-      }
     },
     [selectedIds, select, selectAdd, screenToCanvas, diagram.elements, activeTool, handleConnectionStart]
   );
@@ -395,17 +458,59 @@ export function Canvas() {
     return (order[a.type] || 0) - (order[b.type] || 0);
   });
 
+  // Handle drop from toolbar
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      const elementType = e.dataTransfer.getData("elementType") as "node" | "text" | "container";
+      if (!elementType) return;
+
+      const canvasPos = screenToCanvas(e.clientX, e.clientY);
+
+      // Import the create functions
+      const { addNode, addText, addContainer } = useDiagramStore.getState();
+
+      switch (elementType) {
+        case "node":
+          addNode(canvasPos);
+          break;
+        case "text":
+          addText(canvasPos);
+          break;
+        case "container":
+          addContainer(canvasPos);
+          break;
+      }
+    },
+    [screenToCanvas]
+  );
+
+  // Calculate marquee rectangle bounds
+  const marqueeRect = isMarqueeSelecting ? {
+    x: Math.min(marqueeStart.x, marqueeEnd.x),
+    y: Math.min(marqueeStart.y, marqueeEnd.y),
+    width: Math.abs(marqueeEnd.x - marqueeStart.x),
+    height: Math.abs(marqueeEnd.y - marqueeStart.y),
+  } : null;
+
   return (
     <div
       ref={containerRef}
       id="diagram-canvas"
-      className={`flex-1 overflow-hidden bg-gray-50 relative ${
-        activeTool === "connect" ? "cursor-crosshair" : "cursor-grab active:cursor-grabbing"
+      className={`absolute inset-0 overflow-hidden bg-gray-50 select-none ${
+        activeTool === "connect" ? "cursor-crosshair" : "cursor-default"
       }`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
       <svg
         ref={svgRef}
@@ -480,13 +585,22 @@ export function Canvas() {
               />
             </g>
           )}
+
+          {/* Marquee selection rectangle */}
+          {marqueeRect && (
+            <rect
+              x={marqueeRect.x}
+              y={marqueeRect.y}
+              width={marqueeRect.width}
+              height={marqueeRect.height}
+              fill="rgba(59, 130, 246, 0.1)"
+              stroke="#3b82f6"
+              strokeWidth={1 / viewport.zoom}
+              strokeDasharray={`${4 / viewport.zoom},${4 / viewport.zoom}`}
+            />
+          )}
         </g>
       </svg>
-
-      {/* Zoom indicator */}
-      <div className="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs text-gray-600 font-medium shadow-sm">
-        {Math.round(viewport.zoom * 100)}%
-      </div>
     </div>
   );
 }

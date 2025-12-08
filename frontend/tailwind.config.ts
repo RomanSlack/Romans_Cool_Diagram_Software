@@ -38,6 +38,11 @@ const config: Config = {
           "50%": { transform: "scale(1.02)" },
           "100%": { transform: "scale(1)" },
         },
+        "loading-bar": {
+          "0%": { width: "0%", marginLeft: "0%" },
+          "50%": { width: "40%", marginLeft: "30%" },
+          "100%": { width: "0%", marginLeft: "100%" },
+        },
       },
       animation: {
         "fade-in": "fade-in 150ms ease-out",
@@ -46,6 +51,7 @@ const config: Config = {
         "slide-down": "slide-down 200ms ease-out",
         "scale-in": "scale-in 150ms ease-out",
         "pop": "pop 200ms ease-out",
+        "loading-bar": "loading-bar 1.5s ease-in-out infinite",
       },
     },
   },
