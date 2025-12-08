@@ -12,7 +12,7 @@ interface EdgeRendererProps {
 }
 
 export function EdgeRenderer({ element, elements, isSelected, onMouseDown, onEdgeUpdate, zoom = 1 }: EdgeRendererProps) {
-  const { source, target, style, routing, label, startArrow, endArrow } = element;
+  const { source, target, style, routing, label, startArrow, endArrow, roundedCorners = true } = element;
 
   // Find source and target elements
   const sourceEl = elements.find((e) => e.id === source.elementId) as NodeElement | ContainerElement | undefined;
@@ -26,7 +26,8 @@ export function EdgeRenderer({ element, elements, isSelected, onMouseDown, onEdg
 
   // Calculate path with adjustable midpoint
   const midpointOffset = element.waypoints?.[0]?.x ?? 0.5; // Store midpoint as ratio 0-1
-  const { path, segments } = calculateOrthogonalPath(sourcePoint, targetPoint, source.anchor, target.anchor, routing, midpointOffset);
+  const cornerRadius = roundedCorners ? 8 : 0;
+  const { path, segments } = calculateOrthogonalPath(sourcePoint, targetPoint, source.anchor, target.anchor, routing, midpointOffset, cornerRadius);
 
   // Marker IDs
   const startMarkerId = `arrow-start-${element.id}`;
@@ -593,7 +594,8 @@ function calculateOrthogonalPath(
   sourceAnchor: string,
   targetAnchor: string,
   routing: string,
-  midpointRatio: number = 0.5
+  midpointRatio: number = 0.5,
+  cornerRadius: number = 8
 ): { path: string; pathPoints: Position[]; segments: Segment[] } {
   // For straight routing
   if (routing === "straight") {
@@ -681,7 +683,9 @@ function calculateOrthogonalPath(
     const corner1: Position = { x: midX, y: p1.y };
     const corner2: Position = { x: midX, y: p2.y };
 
-    path += ` L ${corner1.x} ${corner1.y} L ${corner2.x} ${corner2.y}`;
+    // Build path with rounded corners
+    path += ` ${roundedCorner(p1, corner1, corner2, cornerRadius)}`;
+    path += ` ${roundedCorner(corner1, corner2, p2, cornerRadius)}`;
     pathPoints.push(corner1, corner2);
 
     // Segment from p1 to corner1 (horizontal)
@@ -702,7 +706,9 @@ function calculateOrthogonalPath(
     const corner1: Position = { x: p1.x, y: midY };
     const corner2: Position = { x: p2.x, y: midY };
 
-    path += ` L ${corner1.x} ${corner1.y} L ${corner2.x} ${corner2.y}`;
+    // Build path with rounded corners
+    path += ` ${roundedCorner(p1, corner1, corner2, cornerRadius)}`;
+    path += ` ${roundedCorner(corner1, corner2, p2, cornerRadius)}`;
     pathPoints.push(corner1, corner2);
 
     // Segment from p1 to corner1 (vertical)
@@ -715,7 +721,7 @@ function calculateOrthogonalPath(
   } else if (sourceIsHorizontal) {
     // Source horizontal, target vertical - single corner
     const corner: Position = { x: p2.x, y: p1.y };
-    path += ` L ${corner.x} ${corner.y}`;
+    path += ` ${roundedCorner(p1, corner, p2, cornerRadius)}`;
     pathPoints.push(corner);
 
     segments.push({ start: p1, end: corner, direction: "horizontal", draggable: false });
@@ -723,7 +729,7 @@ function calculateOrthogonalPath(
   } else {
     // Source vertical, target horizontal - single corner
     const corner: Position = { x: p1.x, y: p2.y };
-    path += ` L ${corner.x} ${corner.y}`;
+    path += ` ${roundedCorner(p1, corner, p2, cornerRadius)}`;
     pathPoints.push(corner);
 
     segments.push({ start: p1, end: corner, direction: "vertical", draggable: false });

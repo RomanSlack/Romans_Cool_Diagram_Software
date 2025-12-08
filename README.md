@@ -1,6 +1,16 @@
 # Romans Cool Diagram Software (RCDS)
 
+[![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3-06B6D4?logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+[![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-blueviolet?logo=anthropic)](https://claude.ai/code)
+
 A JSON-first diagram editor for creating publication-ready technical diagrams in the "Academic Modern" style.
+
+<p align="center">
+  <img src="images/readme_image_1.png" alt="RCDS Editor" width="800">
+</p>
 
 ## Features
 

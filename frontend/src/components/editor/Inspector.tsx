@@ -459,6 +459,17 @@ function NodeInspector({ element, onChange }: NodeInspectorProps) {
             step={0.5}
           />
         </Field>
+        <Field label="Dashed">
+          <input
+            type="text"
+            value={element.style.strokeDasharray || ""}
+            onChange={(e) =>
+              onChange({ style: { ...element.style, strokeDasharray: e.target.value || undefined } })
+            }
+            className="input"
+            placeholder="5,3"
+          />
+        </Field>
       </Section>
 
       {/* Title Text Style */}
@@ -932,6 +943,16 @@ function EdgeInspector({ element, onChange }: EdgeInspectorProps) {
             size="sm"
           />
         </Field>
+        {element.routing === "orthogonal" && (
+          <Field label="Rounded Corners">
+            <input
+              type="checkbox"
+              checked={element.roundedCorners !== false}
+              onChange={(e) => onChange({ roundedCorners: e.target.checked })}
+              className="w-4 h-4"
+            />
+          </Field>
+        )}
       </Section>
 
       <Section title="Stroke">
