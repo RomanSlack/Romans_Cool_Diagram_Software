@@ -26,7 +26,7 @@ export function EdgeRenderer({ element, elements, isSelected, onMouseDown, onEdg
 
   // Calculate path with adjustable midpoint
   const midpointOffset = element.waypoints?.[0]?.x ?? 0.5; // Store midpoint as ratio 0-1
-  const { path, pathPoints, segments } = calculateOrthogonalPath(sourcePoint, targetPoint, source.anchor, target.anchor, routing, midpointOffset);
+  const { path, segments } = calculateOrthogonalPath(sourcePoint, targetPoint, source.anchor, target.anchor, routing, midpointOffset);
 
   // Marker IDs
   const startMarkerId = `arrow-start-${element.id}`;
@@ -501,83 +501,6 @@ function getConnectionPoint(
   }
 }
 
-function calculatePath(
-  source: { x: number; y: number },
-  target: { x: number; y: number },
-  sourceAnchor: string,
-  targetAnchor: string,
-  routing: string
-): string {
-  if (routing === "straight") {
-    return `M ${source.x} ${source.y} L ${target.x} ${target.y}`;
-  }
-
-  if (routing === "curved") {
-    const dx = target.x - source.x;
-    const dy = target.y - source.y;
-
-    // Smart bezier control points based on direction
-    let cx1, cy1, cx2, cy2;
-
-    if (Math.abs(dx) > Math.abs(dy)) {
-      // Horizontal dominant - curve horizontally
-      cx1 = source.x + dx * 0.4;
-      cy1 = source.y;
-      cx2 = source.x + dx * 0.6;
-      cy2 = target.y;
-    } else {
-      // Vertical dominant - curve vertically
-      cx1 = source.x;
-      cy1 = source.y + dy * 0.4;
-      cx2 = target.x;
-      cy2 = source.y + dy * 0.6;
-    }
-
-    return `M ${source.x} ${source.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${target.x} ${target.y}`;
-  }
-
-  // Orthogonal routing
-  const padding = 25;
-
-  // Determine anchor directions
-  const sourceIsHorizontal = sourceAnchor === "left" || sourceAnchor === "right" ||
-    (sourceAnchor === "auto" && Math.abs(target.x - source.x) > Math.abs(target.y - source.y));
-  const targetIsHorizontal = targetAnchor === "left" || targetAnchor === "right" ||
-    (targetAnchor === "auto" && Math.abs(source.x - target.x) > Math.abs(source.y - target.y));
-
-  // Offset from anchors
-  const sourceDir = getAnchorDirection(sourceAnchor, source, target);
-  const targetDir = getAnchorDirection(targetAnchor, target, source);
-
-  const p1 = {
-    x: source.x + sourceDir.x * padding,
-    y: source.y + sourceDir.y * padding,
-  };
-  const p2 = {
-    x: target.x + targetDir.x * padding,
-    y: target.y + targetDir.y * padding,
-  };
-
-  // Build path with right angles
-  let path = `M ${source.x} ${source.y} L ${p1.x} ${p1.y}`;
-
-  if (sourceIsHorizontal && targetIsHorizontal) {
-    const midX = (p1.x + p2.x) / 2;
-    path += ` L ${midX} ${p1.y} L ${midX} ${p2.y}`;
-  } else if (!sourceIsHorizontal && !targetIsHorizontal) {
-    const midY = (p1.y + p2.y) / 2;
-    path += ` L ${p1.x} ${midY} L ${p2.x} ${midY}`;
-  } else if (sourceIsHorizontal) {
-    path += ` L ${p2.x} ${p1.y}`;
-  } else {
-    path += ` L ${p1.x} ${p2.y}`;
-  }
-
-  path += ` L ${p2.x} ${p2.y} L ${target.x} ${target.y}`;
-
-  return path;
-}
-
 function getAnchorDirection(
   anchor: string,
   from: { x: number; y: number },
@@ -697,7 +620,11 @@ function calculateOrthogonalPath(
 
   if (sourceIsHorizontal && targetIsHorizontal) {
     // Both horizontal - need vertical middle segment
-    const midX = p1.x + (p2.x - p1.x) * midpointRatio;
+    // Clamp midX to ensure it stays between the padding points (no nub sticking out)
+    const minX = Math.min(p1.x, p2.x);
+    const maxX = Math.max(p1.x, p2.x);
+    const rawMidX = p1.x + (p2.x - p1.x) * midpointRatio;
+    const midX = Math.max(minX, Math.min(maxX, rawMidX));
     const corner1: Position = { x: midX, y: p1.y };
     const corner2: Position = { x: midX, y: p2.y };
 
@@ -713,7 +640,11 @@ function calculateOrthogonalPath(
 
   } else if (!sourceIsHorizontal && !targetIsHorizontal) {
     // Both vertical - need horizontal middle segment
-    const midY = p1.y + (p2.y - p1.y) * midpointRatio;
+    // Clamp midY to ensure it stays between the padding points (no nub sticking out)
+    const minY = Math.min(p1.y, p2.y);
+    const maxY = Math.max(p1.y, p2.y);
+    const rawMidY = p1.y + (p2.y - p1.y) * midpointRatio;
+    const midY = Math.max(minY, Math.min(maxY, rawMidY));
     const corner1: Position = { x: p1.x, y: midY };
     const corner2: Position = { x: p2.x, y: midY };
 
