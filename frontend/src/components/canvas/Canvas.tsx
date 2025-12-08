@@ -445,6 +445,11 @@ export function Canvas() {
             elements={diagram.elements}
             isSelected={isSelected}
             onMouseDown={(e) => handleElementMouseDown(e, element)}
+            zoom={viewport.zoom}
+            onWaypointsChange={(waypoints) => {
+              const { setEdgeWaypoints } = useDiagramStore.getState();
+              setEdgeWaypoints(element.id, waypoints);
+            }}
           />
         );
       default:

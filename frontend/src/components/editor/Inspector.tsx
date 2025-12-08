@@ -28,10 +28,11 @@ import {
   AlignEndVertical,
   GalleryHorizontal,
   GalleryVertical,
+  LayoutGrid,
 } from "lucide-react";
 
 export function Inspector() {
-  const { diagram, selectedIds, updateElement, updateCanvas, alignElements, distributeElements } = useDiagramStore();
+  const { diagram, selectedIds, updateElement, updateCanvas, alignElements, distributeElements, distributeAsGrid } = useDiagramStore();
   const { saveProject } = useProjectsStore();
   const [activeTab, setActiveTab] = useState<"canvas" | "export">("canvas");
 
@@ -121,6 +122,17 @@ export function Inspector() {
                 >
                   <GalleryVertical size={16} />
                   <span className="text-xs ml-1">Vertical</span>
+                </AlignButton>
+              </div>
+              <div className="mt-1">
+                <AlignButton
+                  onClick={() => distributeAsGrid()}
+                  disabled={nonEdgeSelectedCount < 2}
+                  tooltip="Arrange as Grid"
+                  wide
+                >
+                  <LayoutGrid size={16} />
+                  <span className="text-xs ml-1">Arrange as Grid</span>
                 </AlignButton>
               </div>
               {nonEdgeSelectedCount < 3 && (

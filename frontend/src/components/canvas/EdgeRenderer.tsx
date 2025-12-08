@@ -1,15 +1,17 @@
 "use client";
 
-import { EdgeElement, DiagramElement, NodeElement, ContainerElement } from "@/lib/schema/types";
+import { EdgeElement, DiagramElement, NodeElement, ContainerElement, Position } from "@/lib/schema/types";
 
 interface EdgeRendererProps {
   element: EdgeElement;
   elements: DiagramElement[];
   isSelected: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
+  onEdgeUpdate?: (updates: Partial<EdgeElement>) => void;
+  zoom?: number;
 }
 
-export function EdgeRenderer({ element, elements, isSelected, onMouseDown }: EdgeRendererProps) {
+export function EdgeRenderer({ element, elements, isSelected, onMouseDown, onEdgeUpdate, zoom = 1 }: EdgeRendererProps) {
   const { source, target, style, routing, label, startArrow, endArrow } = element;
 
   // Find source and target elements
@@ -18,12 +20,13 @@ export function EdgeRenderer({ element, elements, isSelected, onMouseDown }: Edg
 
   if (!sourceEl || !targetEl) return null;
 
-  // Get connection points
-  const sourcePoint = getConnectionPoint(sourceEl, source.anchor, targetEl);
-  const targetPoint = getConnectionPoint(targetEl, target.anchor, sourceEl);
+  // Get connection points with offset support
+  const sourcePoint = getConnectionPoint(sourceEl, source.anchor, targetEl, source.offset);
+  const targetPoint = getConnectionPoint(targetEl, target.anchor, sourceEl, target.offset);
 
-  // Calculate path
-  const path = calculatePath(sourcePoint, targetPoint, source.anchor, target.anchor, routing);
+  // Calculate path with adjustable midpoint
+  const midpointOffset = element.waypoints?.[0]?.x ?? 0.5; // Store midpoint as ratio 0-1
+  const { path, pathPoints, segments } = calculateOrthogonalPath(sourcePoint, targetPoint, source.anchor, target.anchor, routing, midpointOffset);
 
   // Marker IDs
   const startMarkerId = `arrow-start-${element.id}`;
@@ -99,6 +102,106 @@ export function EdgeRenderer({ element, elements, isSelected, onMouseDown }: Edg
         />
       )}
 
+      {/* Edge editing handles - show when selected */}
+      {isSelected && onEdgeUpdate && (
+        <>
+          {/* Draggable segment handles - for moving the middle section of orthogonal edges */}
+          {segments && segments.map((segment, i) => {
+            if (!segment.draggable) return null;
+            const midX = (segment.start.x + segment.end.x) / 2;
+            const midY = (segment.start.y + segment.end.y) / 2;
+            const isHorizontal = segment.direction === "horizontal";
+
+            return (
+              <g key={`segment-${i}`}>
+                {/* Invisible wider hit area */}
+                <line
+                  x1={segment.start.x}
+                  y1={segment.start.y}
+                  x2={segment.end.x}
+                  y2={segment.end.y}
+                  stroke="transparent"
+                  strokeWidth={12 / zoom}
+                  style={{ cursor: isHorizontal ? "ns-resize" : "ew-resize" }}
+                  onMouseDown={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    const startPos = getSvgPoint(e.nativeEvent, zoom);
+                    if (!startPos) return;
+
+                    const handleDrag = (moveEvent: MouseEvent) => {
+                      const currentPos = getSvgPoint(moveEvent, zoom);
+                      if (!currentPos) return;
+
+                      // Calculate new midpoint ratio based on drag
+                      const sourceToTarget = isHorizontal
+                        ? targetPoint.y - sourcePoint.y
+                        : targetPoint.x - sourcePoint.x;
+
+                      if (Math.abs(sourceToTarget) < 1) return;
+
+                      const dragDelta = isHorizontal
+                        ? currentPos.y - startPos.y
+                        : currentPos.x - startPos.x;
+
+                      const currentMid = isHorizontal
+                        ? (segment.start.y - sourcePoint.y) / sourceToTarget
+                        : (segment.start.x - sourcePoint.x) / sourceToTarget;
+
+                      const newMid = Math.max(0.1, Math.min(0.9, currentMid + dragDelta / sourceToTarget));
+
+                      onEdgeUpdate({ waypoints: [{ x: newMid, y: 0 }] });
+                    };
+
+                    const handleUp = () => {
+                      window.removeEventListener("mousemove", handleDrag);
+                      window.removeEventListener("mouseup", handleUp);
+                    };
+
+                    window.addEventListener("mousemove", handleDrag);
+                    window.addEventListener("mouseup", handleUp);
+                  }}
+                />
+                {/* Visual handle */}
+                <rect
+                  x={midX - 4 / zoom}
+                  y={midY - 4 / zoom}
+                  width={8 / zoom}
+                  height={8 / zoom}
+                  rx={2 / zoom}
+                  fill="#2563eb"
+                  stroke="white"
+                  strokeWidth={1.5 / zoom}
+                  style={{ cursor: isHorizontal ? "ns-resize" : "ew-resize", pointerEvents: "none" }}
+                />
+              </g>
+            );
+          })}
+
+          {/* Connection point handles - for sliding along node edge */}
+          <ConnectionPointHandle
+            point={sourcePoint}
+            element={sourceEl}
+            anchor={source.anchor}
+            offset={source.offset || 0}
+            zoom={zoom}
+            onOffsetChange={(newOffset) => {
+              onEdgeUpdate({ source: { ...source, offset: newOffset } });
+            }}
+          />
+          <ConnectionPointHandle
+            point={targetPoint}
+            element={targetEl}
+            anchor={target.anchor}
+            offset={target.offset || 0}
+            zoom={zoom}
+            onOffsetChange={(newOffset) => {
+              onEdgeUpdate({ target: { ...target, offset: newOffset } });
+            }}
+          />
+        </>
+      )}
+
       {/* Label */}
       {label && (
         <EdgeLabel
@@ -108,6 +211,92 @@ export function EdgeRenderer({ element, elements, isSelected, onMouseDown }: Edg
         />
       )}
     </g>
+  );
+}
+
+// Helper to get SVG coordinates from mouse event
+function getSvgPoint(e: MouseEvent, zoom: number): Position | null {
+  const canvas = document.getElementById("diagram-canvas");
+  if (!canvas) return null;
+  const rect = canvas.getBoundingClientRect();
+  const svg = canvas.querySelector("svg");
+  if (!svg) return null;
+  const g = svg.querySelector("g");
+  if (!g) return null;
+
+  // Get the transform from the g element
+  const transform = g.getAttribute("transform") || "";
+  const translateMatch = transform.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/);
+  const tx = translateMatch ? parseFloat(translateMatch[1]) : 0;
+  const ty = translateMatch ? parseFloat(translateMatch[2]) : 0;
+
+  return {
+    x: (e.clientX - rect.left - tx) / zoom,
+    y: (e.clientY - rect.top - ty) / zoom,
+  };
+}
+
+// Connection point handle for sliding along node edge
+interface ConnectionPointHandleProps {
+  point: Position;
+  element: NodeElement | ContainerElement;
+  anchor: string;
+  offset: number;
+  zoom: number;
+  onOffsetChange: (offset: number) => void;
+}
+
+function ConnectionPointHandle({ point, element, anchor, offset, zoom, onOffsetChange }: ConnectionPointHandleProps) {
+  const isHorizontalEdge = anchor === "top" || anchor === "bottom" || anchor === "auto";
+  const isVerticalEdge = anchor === "left" || anchor === "right";
+
+  // Determine drag direction based on which edge we're on
+  const cursor = isHorizontalEdge ? "ew-resize" : isVerticalEdge ? "ns-resize" : "move";
+
+  return (
+    <circle
+      cx={point.x}
+      cy={point.y}
+      r={5 / zoom}
+      fill="#10b981"
+      stroke="white"
+      strokeWidth={2 / zoom}
+      style={{ cursor }}
+      onMouseDown={(e) => {
+        e.stopPropagation();
+        e.preventDefault();
+
+        const startPos = getSvgPoint(e.nativeEvent, zoom);
+        if (!startPos) return;
+
+        const handleDrag = (moveEvent: MouseEvent) => {
+          const currentPos = getSvgPoint(moveEvent, zoom);
+          if (!currentPos) return;
+
+          let newOffset = offset;
+
+          if (anchor === "top" || anchor === "bottom") {
+            // Horizontal sliding along top/bottom edge
+            const delta = currentPos.x - startPos.x;
+            newOffset = Math.max(-0.45, Math.min(0.45, offset + delta / element.size.width));
+          } else if (anchor === "left" || anchor === "right") {
+            // Vertical sliding along left/right edge
+            const delta = currentPos.y - startPos.y;
+            newOffset = Math.max(-0.45, Math.min(0.45, offset + delta / element.size.height));
+          }
+
+          onOffsetChange(newOffset);
+        };
+
+        const handleUp = () => {
+          window.removeEventListener("mousemove", handleDrag);
+          window.removeEventListener("mouseup", handleUp);
+        };
+
+        window.addEventListener("mousemove", handleDrag);
+        window.addEventListener("mouseup", handleUp);
+      }}
+    />
   );
 }
 
@@ -272,7 +461,8 @@ function interpolateAlongPath(points: { x: number; y: number }[], t: number): { 
 function getConnectionPoint(
   element: NodeElement | ContainerElement,
   anchor: string,
-  otherElement: NodeElement | ContainerElement
+  otherElement: NodeElement | ContainerElement,
+  offset?: number
 ): { x: number; y: number } {
   const { position, size } = element;
   const centerX = position.x + size.width / 2;
@@ -293,15 +483,18 @@ function getConnectionPoint(
     }
   }
 
+  // Apply offset (percentage from -0.5 to 0.5)
+  const off = offset || 0;
+
   switch (anchor) {
     case "top":
-      return { x: centerX, y: position.y };
+      return { x: centerX + off * size.width, y: position.y };
     case "bottom":
-      return { x: centerX, y: position.y + size.height };
+      return { x: centerX + off * size.width, y: position.y + size.height };
     case "left":
-      return { x: position.x, y: centerY };
+      return { x: position.x, y: centerY + off * size.height };
     case "right":
-      return { x: position.x + size.width, y: centerY };
+      return { x: position.x + size.width, y: centerY + off * size.height };
     case "center":
     default:
       return { x: centerX, y: centerY };
@@ -410,4 +603,158 @@ function getAnchorDirection(
         return { x: 0, y: dy > 0 ? 1 : -1 };
       }
   }
+}
+
+// Segment info for draggable segments
+interface Segment {
+  start: Position;
+  end: Position;
+  direction: "horizontal" | "vertical";
+  draggable: boolean;
+}
+
+// Calculate orthogonal path with adjustable midpoint and return segment info
+function calculateOrthogonalPath(
+  source: Position,
+  target: Position,
+  sourceAnchor: string,
+  targetAnchor: string,
+  routing: string,
+  midpointRatio: number = 0.5
+): { path: string; pathPoints: Position[]; segments: Segment[] } {
+  // For straight routing
+  if (routing === "straight") {
+    return {
+      path: `M ${source.x} ${source.y} L ${target.x} ${target.y}`,
+      pathPoints: [source, target],
+      segments: [{
+        start: source,
+        end: target,
+        direction: Math.abs(target.x - source.x) > Math.abs(target.y - source.y) ? "horizontal" : "vertical",
+        draggable: false
+      }]
+    };
+  }
+
+  // For curved routing
+  if (routing === "curved") {
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    let cx1, cy1, cx2, cy2;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      cx1 = source.x + dx * 0.4;
+      cy1 = source.y;
+      cx2 = source.x + dx * 0.6;
+      cy2 = target.y;
+    } else {
+      cx1 = source.x;
+      cy1 = source.y + dy * 0.4;
+      cx2 = target.x;
+      cy2 = source.y + dy * 0.6;
+    }
+
+    return {
+      path: `M ${source.x} ${source.y} C ${cx1} ${cy1}, ${cx2} ${cy2}, ${target.x} ${target.y}`,
+      pathPoints: [source, target],
+      segments: []
+    };
+  }
+
+  // Orthogonal routing with adjustable midpoint
+  const padding = 20;
+  const segments: Segment[] = [];
+
+  // Determine anchor directions
+  const sourceDir = getAnchorDirection(sourceAnchor, source, target);
+  const targetDir = getAnchorDirection(targetAnchor, target, source);
+
+  const sourceIsHorizontal = sourceDir.x !== 0;
+  const targetIsHorizontal = targetDir.x !== 0;
+
+  // First padding point from source
+  const p1: Position = {
+    x: source.x + sourceDir.x * padding,
+    y: source.y + sourceDir.y * padding,
+  };
+
+  // Last padding point before target
+  const p2: Position = {
+    x: target.x + targetDir.x * padding,
+    y: target.y + targetDir.y * padding,
+  };
+
+  const pathPoints: Position[] = [source, p1];
+  let path = `M ${source.x} ${source.y} L ${p1.x} ${p1.y}`;
+
+  // First segment (from source to p1)
+  segments.push({
+    start: source,
+    end: p1,
+    direction: sourceIsHorizontal ? "horizontal" : "vertical",
+    draggable: false
+  });
+
+  if (sourceIsHorizontal && targetIsHorizontal) {
+    // Both horizontal - need vertical middle segment
+    const midX = p1.x + (p2.x - p1.x) * midpointRatio;
+    const corner1: Position = { x: midX, y: p1.y };
+    const corner2: Position = { x: midX, y: p2.y };
+
+    path += ` L ${corner1.x} ${corner1.y} L ${corner2.x} ${corner2.y}`;
+    pathPoints.push(corner1, corner2);
+
+    // Segment from p1 to corner1 (horizontal)
+    segments.push({ start: p1, end: corner1, direction: "horizontal", draggable: false });
+    // Middle segment (vertical) - THIS IS DRAGGABLE
+    segments.push({ start: corner1, end: corner2, direction: "vertical", draggable: true });
+    // Segment from corner2 to p2 (horizontal)
+    segments.push({ start: corner2, end: p2, direction: "horizontal", draggable: false });
+
+  } else if (!sourceIsHorizontal && !targetIsHorizontal) {
+    // Both vertical - need horizontal middle segment
+    const midY = p1.y + (p2.y - p1.y) * midpointRatio;
+    const corner1: Position = { x: p1.x, y: midY };
+    const corner2: Position = { x: p2.x, y: midY };
+
+    path += ` L ${corner1.x} ${corner1.y} L ${corner2.x} ${corner2.y}`;
+    pathPoints.push(corner1, corner2);
+
+    // Segment from p1 to corner1 (vertical)
+    segments.push({ start: p1, end: corner1, direction: "vertical", draggable: false });
+    // Middle segment (horizontal) - THIS IS DRAGGABLE
+    segments.push({ start: corner1, end: corner2, direction: "horizontal", draggable: true });
+    // Segment from corner2 to p2 (vertical)
+    segments.push({ start: corner2, end: p2, direction: "vertical", draggable: false });
+
+  } else if (sourceIsHorizontal) {
+    // Source horizontal, target vertical - single corner
+    const corner: Position = { x: p2.x, y: p1.y };
+    path += ` L ${corner.x} ${corner.y}`;
+    pathPoints.push(corner);
+
+    segments.push({ start: p1, end: corner, direction: "horizontal", draggable: false });
+    segments.push({ start: corner, end: p2, direction: "vertical", draggable: false });
+  } else {
+    // Source vertical, target horizontal - single corner
+    const corner: Position = { x: p1.x, y: p2.y };
+    path += ` L ${corner.x} ${corner.y}`;
+    pathPoints.push(corner);
+
+    segments.push({ start: p1, end: corner, direction: "vertical", draggable: false });
+    segments.push({ start: corner, end: p2, direction: "horizontal", draggable: false });
+  }
+
+  path += ` L ${p2.x} ${p2.y} L ${target.x} ${target.y}`;
+  pathPoints.push(p2, target);
+
+  // Last segment (p2 to target)
+  segments.push({
+    start: p2,
+    end: target,
+    direction: targetIsHorizontal ? "horizontal" : "vertical",
+    draggable: false
+  });
+
+  return { path, pathPoints, segments };
 }
