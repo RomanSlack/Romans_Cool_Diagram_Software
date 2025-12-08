@@ -1,6 +1,6 @@
 "use client";
 
-import { Coffee } from "lucide-react";
+import { Coffee, Github } from "lucide-react";
 
 export function BuyMeCoffee() {
   return (
@@ -21,6 +21,29 @@ export function BuyMeCoffee() {
     >
       <Coffee size={14} className="group-hover:animate-bounce" />
       <span>Support</span>
+    </a>
+  );
+}
+
+export function GithubLink() {
+  return (
+    <a
+      href="https://github.com/RomanSlack/Romans_Cool_Diagram_Software"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="
+        fixed bottom-3 right-[380px] z-50
+        flex items-center justify-center
+        w-7 h-7
+        bg-gray-800 hover:bg-gray-900
+        text-white
+        rounded-full shadow-md
+        transition-all duration-200
+        hover:scale-110 hover:shadow-lg
+      "
+      title="View on GitHub"
+    >
+      <Github size={14} />
     </a>
   );
 }

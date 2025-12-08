@@ -6,7 +6,7 @@ import { FloatingToolbar } from "@/components/editor/FloatingToolbar";
 import { Inspector } from "@/components/editor/Inspector";
 import { LeftSidebar } from "@/components/editor/LeftSidebar";
 import { LoadingScreen } from "@/components/ui/LoadingScreen";
-import { BuyMeCoffee } from "@/components/ui/BuyMeCoffee";
+import { BuyMeCoffee, GithubLink } from "@/components/ui/BuyMeCoffee";
 import { useDiagramStore } from "@/lib/store/diagramStore";
 import { createNode, createContainer, createEdge, createText } from "@/lib/schema/types";
 
@@ -225,8 +225,13 @@ export default function Home() {
         <Inspector />
       </div>
 
-      {/* Buy Me a Coffee */}
-      {!isLoading && <BuyMeCoffee />}
+      {/* Support links */}
+      {!isLoading && (
+        <>
+          <GithubLink />
+          <BuyMeCoffee />
+        </>
+      )}
     </>
   );
 }
