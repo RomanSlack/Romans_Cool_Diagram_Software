@@ -9,10 +9,11 @@ interface NodeRendererProps {
 }
 
 export function NodeRenderer({ element, onMouseDown }: NodeRendererProps) {
-  const { position, size, style, content, titleStyle, subtitleStyle, shape } = element;
+  const { position, size, style, content, titleStyle, subtitleStyle, shape, outerBand } = element;
 
   // Generate shadow filter ID
   const shadowId = `shadow-${element.id}`;
+  const outerBandShadowId = `outer-band-shadow-${element.id}`;
 
   // Calculate border radius based on shape
   const getBorderRadius = () => {
@@ -32,7 +33,13 @@ export function NodeRenderer({ element, onMouseDown }: NodeRendererProps) {
 
   const borderRadius = getBorderRadius();
 
-  // Text positioning
+  // Outer band calculations
+  const hasOuterBand = outerBand?.enabled;
+  const bandWidth = outerBand?.width || 6;
+  const bandPadding = outerBand?.padding || 3;
+  const totalOffset = hasOuterBand ? bandWidth + bandPadding : 0;
+
+  // Text positioning - adjusted for outer band
   const centerX = size.width / 2;
   const centerY = size.height / 2;
   const hasSubtitle = content.subtitle && content.subtitle.trim() !== "";
@@ -41,7 +48,7 @@ export function NodeRenderer({ element, onMouseDown }: NodeRendererProps) {
 
   return (
     <g
-      transform={`translate(${position.x}, ${position.y})`}
+      transform={`translate(${position.x - totalOffset}, ${position.y - totalOffset})`}
       onMouseDown={onMouseDown}
       style={{ cursor: "move" }}
     >
@@ -59,8 +66,37 @@ export function NodeRenderer({ element, onMouseDown }: NodeRendererProps) {
         </defs>
       )}
 
-      {/* Main shape */}
-      {shape === "cylinder" ? (
+      {/* Outer band shadow filter */}
+      {hasOuterBand && (
+        <defs>
+          <filter id={outerBandShadowId} x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow
+              dx={2}
+              dy={2}
+              stdDeviation={3}
+              floodColor="rgba(0,0,0,0.15)"
+            />
+          </filter>
+        </defs>
+      )}
+
+      {/* Outer band */}
+      {hasOuterBand && (
+        <rect
+          x={0}
+          y={0}
+          width={size.width + totalOffset * 2}
+          height={size.height + totalOffset * 2}
+          rx={outerBand.borderRadius}
+          ry={outerBand.borderRadius}
+          fill={outerBand.fill}
+          filter={`url(#${outerBandShadowId})`}
+        />
+      )}
+
+      {/* Main shape - offset by outer band */}
+      <g transform={`translate(${totalOffset}, ${totalOffset})`}>
+        {shape === "cylinder" ? (
         <CylinderShape
           width={size.width}
           height={size.height}
@@ -91,35 +127,36 @@ export function NodeRenderer({ element, onMouseDown }: NodeRendererProps) {
         />
       )}
 
-      {/* Title */}
-      <text
-        x={centerX}
-        y={titleY}
-        textAnchor="middle"
-        dominantBaseline="middle"
-        fontFamily={titleStyle.fontFamily}
-        fontSize={titleStyle.fontSize}
-        fontWeight={getFontWeight(titleStyle.fontWeight)}
-        fill={titleStyle.color}
-      >
-        {content.title}
-      </text>
-
-      {/* Subtitle */}
-      {hasSubtitle && subtitleStyle && (
+        {/* Title */}
         <text
           x={centerX}
-          y={subtitleY}
+          y={titleY}
           textAnchor="middle"
           dominantBaseline="middle"
-          fontFamily={subtitleStyle.fontFamily}
-          fontSize={subtitleStyle.fontSize}
-          fontWeight={getFontWeight(subtitleStyle.fontWeight)}
-          fill={subtitleStyle.color}
+          fontFamily={titleStyle.fontFamily}
+          fontSize={titleStyle.fontSize}
+          fontWeight={getFontWeight(titleStyle.fontWeight)}
+          fill={titleStyle.color}
         >
-          {content.subtitle}
+          {content.title}
         </text>
-      )}
+
+        {/* Subtitle */}
+        {hasSubtitle && subtitleStyle && (
+          <text
+            x={centerX}
+            y={subtitleY}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fontFamily={subtitleStyle.fontFamily}
+            fontSize={subtitleStyle.fontSize}
+            fontWeight={getFontWeight(subtitleStyle.fontWeight)}
+            fill={subtitleStyle.color}
+          >
+            {content.subtitle}
+          </text>
+        )}
+      </g>
     </g>
   );
 }

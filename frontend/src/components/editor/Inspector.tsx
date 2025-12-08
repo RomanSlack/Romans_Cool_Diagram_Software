@@ -472,6 +472,85 @@ function NodeInspector({ element, onChange }: NodeInspectorProps) {
         </Field>
       </Section>
 
+      {/* Outer Band */}
+      <Section title="Outer Band">
+        <Field label="Enabled">
+          <input
+            type="checkbox"
+            checked={element.outerBand?.enabled || false}
+            onChange={(e) =>
+              onChange({
+                outerBand: {
+                  enabled: e.target.checked,
+                  fill: element.outerBand?.fill || "#5B8BD4",
+                  width: element.outerBand?.width || 6,
+                  borderRadius: element.outerBand?.borderRadius || 10,
+                  padding: element.outerBand?.padding || 3,
+                },
+              })
+            }
+            className="w-4 h-4"
+          />
+        </Field>
+        {element.outerBand?.enabled && (
+          <>
+            <Field label="Color">
+              <div className="flex gap-2 items-center">
+                <ColorInput
+                  value={element.outerBand.fill}
+                  onChange={(fill) =>
+                    onChange({ outerBand: { ...element.outerBand!, fill } })
+                  }
+                />
+                <input
+                  type="text"
+                  value={element.outerBand.fill}
+                  onChange={(e) =>
+                    onChange({ outerBand: { ...element.outerBand!, fill: e.target.value } })
+                  }
+                  className="input flex-1"
+                />
+              </div>
+            </Field>
+            <Field label="Width">
+              <input
+                type="number"
+                value={element.outerBand.width}
+                onChange={(e) =>
+                  onChange({ outerBand: { ...element.outerBand!, width: Number(e.target.value) } })
+                }
+                className="input"
+                min={1}
+                max={20}
+              />
+            </Field>
+            <Field label="Padding">
+              <input
+                type="number"
+                value={element.outerBand.padding}
+                onChange={(e) =>
+                  onChange({ outerBand: { ...element.outerBand!, padding: Number(e.target.value) } })
+                }
+                className="input"
+                min={0}
+                max={20}
+              />
+            </Field>
+            <Field label="Corner Radius">
+              <input
+                type="number"
+                value={element.outerBand.borderRadius}
+                onChange={(e) =>
+                  onChange({ outerBand: { ...element.outerBand!, borderRadius: Number(e.target.value) } })
+                }
+                className="input"
+                min={0}
+              />
+            </Field>
+          </>
+        )}
+      </Section>
+
       {/* Title Text Style */}
       <Section title="Title Style">
         <Field label="Font">
