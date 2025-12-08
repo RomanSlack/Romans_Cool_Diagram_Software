@@ -317,6 +317,11 @@ export function Canvas() {
   // Element click handler
   const handleElementMouseDown = useCallback(
     (e: React.MouseEvent, element: DiagramElement) => {
+      // Middle click should only pan - let it bubble up to canvas handler
+      if (e.button === 1) {
+        return;
+      }
+
       e.stopPropagation();
       e.preventDefault(); // Prevent text selection
 
@@ -502,13 +507,19 @@ export function Canvas() {
     height: Math.abs(marqueeEnd.y - marqueeStart.y),
   } : null;
 
+  // Determine cursor based on state
+  const getCursor = () => {
+    if (isPanning) return "grabbing";
+    if (activeTool === "connect") return "crosshair";
+    return "default";
+  };
+
   return (
     <div
       ref={containerRef}
       id="diagram-canvas"
-      className={`absolute inset-0 overflow-hidden bg-gray-50 select-none ${
-        activeTool === "connect" ? "cursor-crosshair" : "cursor-default"
-      }`}
+      className="absolute inset-0 overflow-hidden bg-gray-50 select-none"
+      style={{ cursor: getCursor() }}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

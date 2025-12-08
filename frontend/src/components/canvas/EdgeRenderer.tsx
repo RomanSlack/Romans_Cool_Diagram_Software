@@ -43,7 +43,7 @@ export function EdgeRenderer({ element, elements, isSelected, onMouseDown, onEdg
             id={startMarkerId}
             markerWidth={10}
             markerHeight={10}
-            refX={0}
+            refX={10}
             refY={5}
             orient="auto-start-reverse"
             markerUnits="strokeWidth"
@@ -129,26 +129,30 @@ export function EdgeRenderer({ element, elements, isSelected, onMouseDown, onEdg
                     const startPos = getSvgPoint(e.nativeEvent, zoom);
                     if (!startPos) return;
 
+                    const startMidpoint = element.waypoints?.[0]?.x ?? 0.5;
+
                     const handleDrag = (moveEvent: MouseEvent) => {
                       const currentPos = getSvgPoint(moveEvent, zoom);
                       if (!currentPos) return;
 
-                      // Calculate new midpoint ratio based on drag
-                      const sourceToTarget = isHorizontal
-                        ? targetPoint.y - sourcePoint.y
-                        : targetPoint.x - sourcePoint.x;
+                      // Calculate extension allowance (same as in calculateOrthogonalPath)
+                      // For vertical segments (isHorizontal=false), we drag left/right (X)
+                      // For horizontal segments (isHorizontal=true), we drag up/down (Y)
+                      const range = isHorizontal
+                        ? Math.abs(targetPoint.y - sourcePoint.y)
+                        : Math.abs(targetPoint.x - sourcePoint.x);
+                      const extensionAllowance = Math.max(range, 100);
 
-                      if (Math.abs(sourceToTarget) < 1) return;
-
+                      // Calculate drag delta - vertical segment moves horizontally, horizontal segment moves vertically
                       const dragDelta = isHorizontal
                         ? currentPos.y - startPos.y
                         : currentPos.x - startPos.x;
 
-                      const currentMid = isHorizontal
-                        ? (segment.start.y - sourcePoint.y) / sourceToTarget
-                        : (segment.start.x - sourcePoint.x) / sourceToTarget;
+                      // Convert drag distance to ratio (extensionAllowance * 2 is full range for 0-1)
+                      const ratioChange = dragDelta / (extensionAllowance * 2);
 
-                      const newMid = Math.max(0.1, Math.min(0.9, currentMid + dragDelta / sourceToTarget));
+                      // Allow full range 0-1 for maximum flexibility
+                      const newMid = Math.max(0, Math.min(1, startMidpoint + ratioChange));
 
                       onEdgeUpdate({ waypoints: [{ x: newMid, y: 0 }] });
                     };
@@ -178,27 +182,39 @@ export function EdgeRenderer({ element, elements, isSelected, onMouseDown, onEdg
             );
           })}
 
-          {/* Connection point handles - for sliding along node edge */}
-          <ConnectionPointHandle
-            point={sourcePoint}
-            element={sourceEl}
-            anchor={source.anchor}
-            offset={source.offset || 0}
-            zoom={zoom}
-            onOffsetChange={(newOffset) => {
-              onEdgeUpdate({ source: { ...source, offset: newOffset } });
-            }}
-          />
-          <ConnectionPointHandle
-            point={targetPoint}
-            element={targetEl}
-            anchor={target.anchor}
-            offset={target.offset || 0}
-            zoom={zoom}
-            onOffsetChange={(newOffset) => {
-              onEdgeUpdate({ target: { ...target, offset: newOffset } });
-            }}
-          />
+          {/* Connection point handles - positioned at middle of entry/exit segments */}
+          {segments && segments.length >= 2 && (
+            <>
+              {/* Source connection handle - middle of first segment */}
+              <ConnectionPointHandle
+                point={{
+                  x: (segments[0].start.x + segments[0].end.x) / 2,
+                  y: (segments[0].start.y + segments[0].end.y) / 2,
+                }}
+                element={sourceEl}
+                anchor={source.anchor}
+                offset={source.offset || 0}
+                zoom={zoom}
+                onOffsetChange={(newOffset) => {
+                  onEdgeUpdate({ source: { ...source, offset: newOffset } });
+                }}
+              />
+              {/* Target connection handle - middle of last segment */}
+              <ConnectionPointHandle
+                point={{
+                  x: (segments[segments.length - 1].start.x + segments[segments.length - 1].end.x) / 2,
+                  y: (segments[segments.length - 1].start.y + segments[segments.length - 1].end.y) / 2,
+                }}
+                element={targetEl}
+                anchor={target.anchor}
+                offset={target.offset || 0}
+                zoom={zoom}
+                onOffsetChange={(newOffset) => {
+                  onEdgeUpdate({ target: { ...target, offset: newOffset } });
+                }}
+              />
+            </>
+          )}
         </>
       )}
 
@@ -536,6 +552,40 @@ interface Segment {
   draggable: boolean;
 }
 
+// Helper to create a rounded corner path segment
+// Uses quadratic bezier curve to round the corner
+function roundedCorner(from: Position, corner: Position, to: Position, radius: number): string {
+  // Calculate vectors
+  const v1 = { x: corner.x - from.x, y: corner.y - from.y };
+  const v2 = { x: to.x - corner.x, y: to.y - corner.y };
+
+  // Normalize and get lengths
+  const len1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+  const len2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
+
+  // Limit radius to half the shortest segment
+  const maxRadius = Math.min(len1, len2) / 2;
+  const r = Math.min(radius, maxRadius);
+
+  if (r < 1) {
+    // Too small for rounding, just use straight lines
+    return `L ${corner.x} ${corner.y}`;
+  }
+
+  // Calculate start and end points of the curve
+  const startPoint = {
+    x: corner.x - (v1.x / len1) * r,
+    y: corner.y - (v1.y / len1) * r,
+  };
+  const endPoint = {
+    x: corner.x + (v2.x / len2) * r,
+    y: corner.y + (v2.y / len2) * r,
+  };
+
+  // Use quadratic bezier with corner as control point
+  return `L ${startPoint.x} ${startPoint.y} Q ${corner.x} ${corner.y} ${endPoint.x} ${endPoint.y}`;
+}
+
 // Calculate orthogonal path with adjustable midpoint and return segment info
 function calculateOrthogonalPath(
   source: Position,
@@ -620,11 +670,14 @@ function calculateOrthogonalPath(
 
   if (sourceIsHorizontal && targetIsHorizontal) {
     // Both horizontal - need vertical middle segment
-    // Clamp midX to ensure it stays between the padding points (no nub sticking out)
-    const minX = Math.min(p1.x, p2.x);
-    const maxX = Math.max(p1.x, p2.x);
-    const rawMidX = p1.x + (p2.x - p1.x) * midpointRatio;
-    const midX = Math.max(minX, Math.min(maxX, rawMidX));
+    // Allow midpoint to extend beyond p1/p2 range for proper routing around nodes
+    // midpointRatio of 0.5 = halfway, <0.5 = closer to source, >0.5 = closer to target
+    // We use a wider range to allow extending past the nodes when needed
+    const range = Math.abs(p2.x - p1.x);
+    const extensionAllowance = Math.max(range, 100); // Allow extending at least 100px or the full range
+    const centerX = (p1.x + p2.x) / 2;
+    // Map ratio 0-1 to full extension range (ratio 0.5 = center)
+    const midX = centerX + (midpointRatio - 0.5) * 2 * extensionAllowance;
     const corner1: Position = { x: midX, y: p1.y };
     const corner2: Position = { x: midX, y: p2.y };
 
@@ -640,11 +693,12 @@ function calculateOrthogonalPath(
 
   } else if (!sourceIsHorizontal && !targetIsHorizontal) {
     // Both vertical - need horizontal middle segment
-    // Clamp midY to ensure it stays between the padding points (no nub sticking out)
-    const minY = Math.min(p1.y, p2.y);
-    const maxY = Math.max(p1.y, p2.y);
-    const rawMidY = p1.y + (p2.y - p1.y) * midpointRatio;
-    const midY = Math.max(minY, Math.min(maxY, rawMidY));
+    // Allow midpoint to extend beyond p1/p2 range for proper routing around nodes
+    const range = Math.abs(p2.y - p1.y);
+    const extensionAllowance = Math.max(range, 100); // Allow extending at least 100px or the full range
+    const centerY = (p1.y + p2.y) / 2;
+    // Map ratio 0-1 to full extension range (ratio 0.5 = center)
+    const midY = centerY + (midpointRatio - 0.5) * 2 * extensionAllowance;
     const corner1: Position = { x: p1.x, y: midY };
     const corner2: Position = { x: p2.x, y: midY };
 
