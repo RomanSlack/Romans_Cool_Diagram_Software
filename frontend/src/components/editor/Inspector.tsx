@@ -614,6 +614,70 @@ function NodeInspector({ element, onChange }: NodeInspectorProps) {
         </Field>
       </Section>
 
+      {/* Subtitle Style */}
+      <Section title="Subtitle Style">
+        <Field label="Color">
+          <div className="flex gap-2 items-center">
+            <ColorInput
+              value={element.subtitleStyle?.color || "#1a1a1a"}
+              onChange={(color) =>
+                onChange({
+                  subtitleStyle: {
+                    ...(element.subtitleStyle || {
+                      fontFamily: "Inter, system-ui, sans-serif",
+                      fontSize: 10,
+                      fontWeight: "normal" as const,
+                      textAlign: "center" as const,
+                    }),
+                    color,
+                  },
+                })
+              }
+            />
+            <input
+              type="text"
+              value={element.subtitleStyle?.color || "#1a1a1a"}
+              onChange={(e) =>
+                onChange({
+                  subtitleStyle: {
+                    ...(element.subtitleStyle || {
+                      fontFamily: "Inter, system-ui, sans-serif",
+                      fontSize: 10,
+                      fontWeight: "normal" as const,
+                      textAlign: "center" as const,
+                    }),
+                    color: e.target.value,
+                  },
+                })
+              }
+              className="input flex-1"
+            />
+          </div>
+        </Field>
+      </Section>
+
+      {/* Text Position */}
+      <Section title="Text Position">
+        <Field label="Vertical Offset">
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={-30}
+              max={30}
+              step={1}
+              value={element.textVerticalOffset || 0}
+              onChange={(e) =>
+                onChange({ textVerticalOffset: Number(e.target.value) })
+              }
+              className="flex-1"
+            />
+            <span className="text-xs text-gray-500 w-10 text-right">
+              {element.textVerticalOffset || 0}px
+            </span>
+          </div>
+        </Field>
+      </Section>
+
       {/* Shadow */}
       <Section title="Shadow">
         <Field label="Enabled">

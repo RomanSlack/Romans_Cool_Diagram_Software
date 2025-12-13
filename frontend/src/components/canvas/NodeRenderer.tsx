@@ -39,11 +39,12 @@ export function NodeRenderer({ element, onMouseDown }: NodeRendererProps) {
   const bandPadding = outerBand?.padding || 3;
   const totalOffset = hasOuterBand ? bandWidth + bandPadding : 0;
 
-  // Text positioning - adjusted for outer band
+  // Text positioning - adjusted for outer band and vertical offset
   const centerX = size.width / 2;
   const centerY = size.height / 2;
+  const verticalOffset = element.textVerticalOffset || 0;
   const hasSubtitle = content.subtitle && content.subtitle.trim() !== "";
-  const titleY = hasSubtitle ? centerY - 8 : centerY;
+  const titleY = (hasSubtitle ? centerY - 8 : centerY) + verticalOffset;
   const subtitleY = titleY + titleStyle.fontSize + 4;
 
   return (
