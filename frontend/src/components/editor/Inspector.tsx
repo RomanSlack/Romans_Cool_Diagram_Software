@@ -1818,11 +1818,17 @@ interface ExportPanelProps {
 }
 
 function ExportPanel({ diagram, onSave }: ExportPanelProps) {
+  const [exportScale, setExportScale] = useState(2);
+
   const handleExportPNG = async () => {
     const { toPng } = await import("html-to-image");
     const canvas = document.querySelector("#diagram-canvas") as HTMLElement;
     if (canvas) {
-      const dataUrl = await toPng(canvas, { backgroundColor: "#ffffff" });
+      const dataUrl = await toPng(canvas, {
+        backgroundColor: "#ffffff",
+        pixelRatio: exportScale,
+        quality: 1,
+      });
       const link = document.createElement("a");
       link.download = `${diagram.name || "diagram"}.png`;
       link.href = dataUrl;
@@ -1855,6 +1861,27 @@ function ExportPanel({ diagram, onSave }: ExportPanelProps) {
 
   return (
     <div className="p-4 space-y-4">
+      <Section title="PNG Quality">
+        <Field label="Resolution Scale">
+          <div className="flex items-center gap-2">
+            <Dropdown
+              value={String(exportScale)}
+              onChange={(value) => setExportScale(Number(value))}
+              options={[
+                { value: "1", label: "1x (Standard)" },
+                { value: "2", label: "2x (Retina)" },
+                { value: "3", label: "3x (High)" },
+                { value: "4", label: "4x (Ultra)" },
+              ]}
+              size="sm"
+            />
+          </div>
+        </Field>
+        <p className="text-xs text-gray-400 mt-1">
+          Higher = sharper but larger file size
+        </p>
+      </Section>
+
       <Section title="Quick Export">
         <div className="space-y-2">
           <button
@@ -1864,7 +1891,7 @@ function ExportPanel({ diagram, onSave }: ExportPanelProps) {
             <FileImage size={18} className="text-gray-400" />
             <div className="flex-1 text-left">
               <p className="font-medium">Export PNG</p>
-              <p className="text-xs text-gray-400">High quality image</p>
+              <p className="text-xs text-gray-400">{exportScale}x resolution</p>
             </div>
           </button>
           <button

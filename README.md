@@ -10,7 +10,7 @@
 > **Free, open-source alternative to Draw.io (diagrams.net), Lucidchart, and Figma for technical diagrams** — Create beautiful architecture diagrams, flowcharts, system designs, and network diagrams with a modern, publication-ready aesthetic.
 
 <p align="center">
-  <img src="images/readme_image_1.png" alt="RCDS - Open Source Diagram Editor Screenshot" width="800">
+  <img src="images/readme_image_2.png" alt="RCDS - Open Source Diagram Editor Screenshot" width="700">
 </p>
 
 ## Why RCDS?
@@ -39,6 +39,10 @@ RCDS (Romans Cool Diagram Software) is a **free, browser-based diagram editor** 
 - **Local Storage** — Projects saved in browser (IndexedDB), no account required
 - **Self-Hostable** — Run on your own infrastructure with Docker
 - **100% Free & Open Source** — MIT licensed, no premium tiers
+
+<p align="center">
+  <img src="images/vos_diagram_new_1.png" alt="Example Diagram" width="600">
+</p>
 
 ## Quick Start
 

@@ -86,7 +86,11 @@ export function LeftSidebar() {
     const { toPng } = await import("html-to-image");
     const canvas = document.querySelector("#diagram-canvas") as HTMLElement;
     if (canvas) {
-      const dataUrl = await toPng(canvas, { backgroundColor: "#ffffff" });
+      const dataUrl = await toPng(canvas, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2, // 2x resolution for better quality
+        quality: 1,
+      });
       const link = document.createElement("a");
       link.download = `${diagram.name || "diagram"}.png`;
       link.href = dataUrl;
