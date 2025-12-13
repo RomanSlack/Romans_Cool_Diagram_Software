@@ -42,105 +42,136 @@ export function Inspector() {
   const hasMultipleSelected = selectedIds.length > 1;
   const nonEdgeSelectedCount = selectedElements.filter((e) => e.type !== "edge").length;
 
+  // Check if all selected elements are the same type
+  const allSameType = hasMultipleSelected && selectedElements.every((e) => e.type === selectedElements[0].type);
+  const selectedType = allSameType ? selectedElements[0].type : null;
+
+  // Helper to update all selected elements
+  const updateAllSelected = (updates: Record<string, unknown>) => {
+    selectedIds.forEach((id) => {
+      updateElement(id, updates);
+    });
+  };
+
   // Show multi-select panel when multiple elements are selected
   if (hasMultipleSelected) {
     return (
       <div className="w-72 bg-white border-l border-gray-200 flex flex-col animate-fade-in">
         <div className="p-4 border-b border-gray-100">
           <h2 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            {selectedIds.length} Elements Selected
+            {selectedIds.length} {selectedType ? `${getElementTypeName(selectedType)}s` : "Elements"} Selected
           </h2>
         </div>
 
         <div className="flex-1 overflow-y-auto pb-16">
           <div className="p-4 space-y-6">
-            {/* Alignment */}
-            <Section title="Align">
-              <div className="grid grid-cols-3 gap-1">
-                <AlignButton
-                  onClick={() => alignElements("left")}
-                  disabled={nonEdgeSelectedCount < 2}
-                  tooltip="Align Left"
-                >
-                  <AlignLeft size={16} />
-                </AlignButton>
-                <AlignButton
-                  onClick={() => alignElements("center")}
-                  disabled={nonEdgeSelectedCount < 2}
-                  tooltip="Align Center"
-                >
-                  <AlignCenter size={16} />
-                </AlignButton>
-                <AlignButton
-                  onClick={() => alignElements("right")}
-                  disabled={nonEdgeSelectedCount < 2}
-                  tooltip="Align Right"
-                >
-                  <AlignRight size={16} />
-                </AlignButton>
-                <AlignButton
-                  onClick={() => alignElements("top")}
-                  disabled={nonEdgeSelectedCount < 2}
-                  tooltip="Align Top"
-                >
-                  <AlignStartVertical size={16} />
-                </AlignButton>
-                <AlignButton
-                  onClick={() => alignElements("middle")}
-                  disabled={nonEdgeSelectedCount < 2}
-                  tooltip="Align Middle"
-                >
-                  <AlignCenterVertical size={16} />
-                </AlignButton>
-                <AlignButton
-                  onClick={() => alignElements("bottom")}
-                  disabled={nonEdgeSelectedCount < 2}
-                  tooltip="Align Bottom"
-                >
-                  <AlignEndVertical size={16} />
-                </AlignButton>
-              </div>
-            </Section>
+            {/* Alignment - only for non-edge elements */}
+            {nonEdgeSelectedCount >= 2 && (
+              <Section title="Align">
+                <div className="grid grid-cols-3 gap-1">
+                  <AlignButton
+                    onClick={() => alignElements("left")}
+                    disabled={nonEdgeSelectedCount < 2}
+                    tooltip="Align Left"
+                  >
+                    <AlignLeft size={16} />
+                  </AlignButton>
+                  <AlignButton
+                    onClick={() => alignElements("center")}
+                    disabled={nonEdgeSelectedCount < 2}
+                    tooltip="Align Center"
+                  >
+                    <AlignCenter size={16} />
+                  </AlignButton>
+                  <AlignButton
+                    onClick={() => alignElements("right")}
+                    disabled={nonEdgeSelectedCount < 2}
+                    tooltip="Align Right"
+                  >
+                    <AlignRight size={16} />
+                  </AlignButton>
+                  <AlignButton
+                    onClick={() => alignElements("top")}
+                    disabled={nonEdgeSelectedCount < 2}
+                    tooltip="Align Top"
+                  >
+                    <AlignStartVertical size={16} />
+                  </AlignButton>
+                  <AlignButton
+                    onClick={() => alignElements("middle")}
+                    disabled={nonEdgeSelectedCount < 2}
+                    tooltip="Align Middle"
+                  >
+                    <AlignCenterVertical size={16} />
+                  </AlignButton>
+                  <AlignButton
+                    onClick={() => alignElements("bottom")}
+                    disabled={nonEdgeSelectedCount < 2}
+                    tooltip="Align Bottom"
+                  >
+                    <AlignEndVertical size={16} />
+                  </AlignButton>
+                </div>
+              </Section>
+            )}
 
-            {/* Distribution */}
-            <Section title="Distribute">
-              <div className="grid grid-cols-2 gap-1">
-                <AlignButton
-                  onClick={() => distributeElements("horizontal")}
-                  disabled={nonEdgeSelectedCount < 3}
-                  tooltip="Distribute Horizontally"
-                  wide
-                >
-                  <GalleryHorizontal size={16} />
-                  <span className="text-xs ml-1">Horizontal</span>
-                </AlignButton>
-                <AlignButton
-                  onClick={() => distributeElements("vertical")}
-                  disabled={nonEdgeSelectedCount < 3}
-                  tooltip="Distribute Vertically"
-                  wide
-                >
-                  <GalleryVertical size={16} />
-                  <span className="text-xs ml-1">Vertical</span>
-                </AlignButton>
-              </div>
-              <div className="mt-1">
-                <AlignButton
-                  onClick={() => distributeAsGrid()}
-                  disabled={nonEdgeSelectedCount < 2}
-                  tooltip="Arrange as Grid"
-                  wide
-                >
-                  <LayoutGrid size={16} />
-                  <span className="text-xs ml-1">Arrange as Grid</span>
-                </AlignButton>
-              </div>
-              {nonEdgeSelectedCount < 3 && (
-                <p className="text-xs text-gray-400 mt-2">
-                  Select 3+ elements to distribute
-                </p>
-              )}
-            </Section>
+            {/* Distribution - only for non-edge elements */}
+            {nonEdgeSelectedCount >= 2 && (
+              <Section title="Distribute">
+                <div className="grid grid-cols-2 gap-1">
+                  <AlignButton
+                    onClick={() => distributeElements("horizontal")}
+                    disabled={nonEdgeSelectedCount < 3}
+                    tooltip="Distribute Horizontally"
+                    wide
+                  >
+                    <GalleryHorizontal size={16} />
+                    <span className="text-xs ml-1">Horizontal</span>
+                  </AlignButton>
+                  <AlignButton
+                    onClick={() => distributeElements("vertical")}
+                    disabled={nonEdgeSelectedCount < 3}
+                    tooltip="Distribute Vertically"
+                    wide
+                  >
+                    <GalleryVertical size={16} />
+                    <span className="text-xs ml-1">Vertical</span>
+                  </AlignButton>
+                </div>
+                <div className="mt-1">
+                  <AlignButton
+                    onClick={() => distributeAsGrid()}
+                    disabled={nonEdgeSelectedCount < 2}
+                    tooltip="Arrange as Grid"
+                    wide
+                  >
+                    <LayoutGrid size={16} />
+                    <span className="text-xs ml-1">Arrange as Grid</span>
+                  </AlignButton>
+                </div>
+                {nonEdgeSelectedCount < 3 && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Select 3+ elements to distribute
+                  </p>
+                )}
+              </Section>
+            )}
+
+            {/* Multi-select property editing for edges */}
+            {selectedType === "edge" && (
+              <MultiEdgeInspector
+                elements={selectedElements as EdgeElement[]}
+                onChange={updateAllSelected}
+              />
+            )}
+
+            {/* Multi-select property editing for nodes */}
+            {selectedType === "node" && (
+              <MultiNodeInspector
+                elements={selectedElements as NodeElement[]}
+                onChange={updateAllSelected}
+              />
+            )}
 
             {/* Selection info */}
             <Section title="Selection">
@@ -1143,24 +1174,68 @@ function EdgeInspector({ element, onChange }: EdgeInspectorProps) {
             checked={!!element.endArrow}
             onChange={(e) =>
               onChange({
-                endArrow: e.target.checked ? { type: "filled", size: 8 } : null,
+                endArrow: e.target.checked ? { type: "barbed", size: 8 } : null,
               })
             }
             className="w-4 h-4"
           />
         </Field>
+        {element.endArrow && (
+          <Field label="End Type">
+            <Dropdown
+              value={element.endArrow.type}
+              onChange={(value) =>
+                onChange({
+                  endArrow: { ...element.endArrow!, type: value as "filled" | "barbed" | "open" | "diamond" | "diamond-open" | "circle" | "circle-open" },
+                })
+              }
+              options={[
+                { value: "filled", label: "Filled" },
+                { value: "barbed", label: "Barbed" },
+                { value: "open", label: "Open" },
+                { value: "diamond", label: "Diamond" },
+                { value: "diamond-open", label: "Diamond Open" },
+                { value: "circle", label: "Circle" },
+                { value: "circle-open", label: "Circle Open" },
+              ]}
+              size="sm"
+            />
+          </Field>
+        )}
         <Field label="Start Arrow">
           <input
             type="checkbox"
             checked={!!element.startArrow}
             onChange={(e) =>
               onChange({
-                startArrow: e.target.checked ? { type: "filled", size: 8 } : null,
+                startArrow: e.target.checked ? { type: "barbed", size: 8 } : null,
               })
             }
             className="w-4 h-4"
           />
         </Field>
+        {element.startArrow && (
+          <Field label="Start Type">
+            <Dropdown
+              value={element.startArrow.type}
+              onChange={(value) =>
+                onChange({
+                  startArrow: { ...element.startArrow!, type: value as "filled" | "barbed" | "open" | "diamond" | "diamond-open" | "circle" | "circle-open" },
+                })
+              }
+              options={[
+                { value: "filled", label: "Filled" },
+                { value: "barbed", label: "Barbed" },
+                { value: "open", label: "Open" },
+                { value: "diamond", label: "Diamond" },
+                { value: "diamond-open", label: "Diamond Open" },
+                { value: "circle", label: "Circle" },
+                { value: "circle-open", label: "Circle Open" },
+              ]}
+              size="sm"
+            />
+          </Field>
+        )}
       </Section>
 
       <Section title="Label">
@@ -1193,6 +1268,358 @@ function EdgeInspector({ element, onChange }: EdgeInspectorProps) {
         </Field>
       </Section>
     </div>
+  );
+}
+
+// ============ MULTI-SELECT INSPECTORS ============
+
+interface MultiEdgeInspectorProps {
+  elements: EdgeElement[];
+  onChange: (updates: Record<string, unknown>) => void;
+}
+
+function MultiEdgeInspector({ elements, onChange }: MultiEdgeInspectorProps) {
+  // Get first element as reference for current values
+  const first = elements[0];
+
+  return (
+    <>
+      <Section title="Stroke">
+        <div className="flex gap-2 items-center">
+          <ColorInput
+            value={first.style.stroke}
+            onChange={(stroke) => onChange({ style: { ...first.style, stroke } })}
+          />
+          <input
+            type="text"
+            value={first.style.stroke}
+            onChange={(e) => onChange({ style: { ...first.style, stroke: e.target.value } })}
+            className="input flex-1"
+          />
+        </div>
+        <Field label="Width">
+          <input
+            type="number"
+            value={first.style.strokeWidth}
+            onChange={(e) =>
+              onChange({ style: { ...first.style, strokeWidth: Number(e.target.value) } })
+            }
+            className="input"
+            min={0.5}
+            step={0.5}
+          />
+        </Field>
+        <Field label="Dashed">
+          <input
+            type="text"
+            value={first.style.strokeDasharray || ""}
+            onChange={(e) =>
+              onChange({ style: { ...first.style, strokeDasharray: e.target.value || undefined } })
+            }
+            className="input"
+            placeholder="5,3"
+          />
+        </Field>
+      </Section>
+
+      <Section title="Routing">
+        <Field label="Type">
+          <Dropdown
+            value={first.routing}
+            onChange={(value) =>
+              onChange({ routing: value as "orthogonal" | "straight" | "curved" })
+            }
+            options={[
+              { value: "orthogonal", label: "Orthogonal" },
+              { value: "straight", label: "Straight" },
+              { value: "curved", label: "Curved" },
+            ]}
+            size="sm"
+          />
+        </Field>
+        <Field label="Rounded Corners">
+          <input
+            type="checkbox"
+            checked={first.roundedCorners !== false}
+            onChange={(e) => onChange({ roundedCorners: e.target.checked })}
+            className="w-4 h-4"
+          />
+        </Field>
+      </Section>
+
+      <Section title="Arrows">
+        <Field label="End Arrow">
+          <input
+            type="checkbox"
+            checked={!!first.endArrow}
+            onChange={(e) =>
+              onChange({
+                endArrow: e.target.checked ? { type: "barbed", size: 8 } : null,
+              })
+            }
+            className="w-4 h-4"
+          />
+        </Field>
+        {first.endArrow && (
+          <Field label="End Type">
+            <Dropdown
+              value={first.endArrow.type}
+              onChange={(value) =>
+                onChange({
+                  endArrow: { ...first.endArrow!, type: value as "filled" | "barbed" | "open" | "diamond" | "diamond-open" | "circle" | "circle-open" },
+                })
+              }
+              options={[
+                { value: "filled", label: "Filled" },
+                { value: "barbed", label: "Barbed" },
+                { value: "open", label: "Open" },
+                { value: "diamond", label: "Diamond" },
+                { value: "diamond-open", label: "Diamond Open" },
+                { value: "circle", label: "Circle" },
+                { value: "circle-open", label: "Circle Open" },
+              ]}
+              size="sm"
+            />
+          </Field>
+        )}
+        <Field label="Start Arrow">
+          <input
+            type="checkbox"
+            checked={!!first.startArrow}
+            onChange={(e) =>
+              onChange({
+                startArrow: e.target.checked ? { type: "barbed", size: 8 } : null,
+              })
+            }
+            className="w-4 h-4"
+          />
+        </Field>
+        {first.startArrow && (
+          <Field label="Start Type">
+            <Dropdown
+              value={first.startArrow.type}
+              onChange={(value) =>
+                onChange({
+                  startArrow: { ...first.startArrow!, type: value as "filled" | "barbed" | "open" | "diamond" | "diamond-open" | "circle" | "circle-open" },
+                })
+              }
+              options={[
+                { value: "filled", label: "Filled" },
+                { value: "barbed", label: "Barbed" },
+                { value: "open", label: "Open" },
+                { value: "diamond", label: "Diamond" },
+                { value: "diamond-open", label: "Diamond Open" },
+                { value: "circle", label: "Circle" },
+                { value: "circle-open", label: "Circle Open" },
+              ]}
+              size="sm"
+            />
+          </Field>
+        )}
+      </Section>
+    </>
+  );
+}
+
+interface MultiNodeInspectorProps {
+  elements: NodeElement[];
+  onChange: (updates: Record<string, unknown>) => void;
+}
+
+function MultiNodeInspector({ elements, onChange }: MultiNodeInspectorProps) {
+  // Get first element as reference for current values
+  const first = elements[0];
+
+  return (
+    <>
+      <Section title="Shape">
+        <Field label="Type">
+          <Dropdown
+            value={first.shape}
+            onChange={(value) => onChange({ shape: value as NodeElement["shape"] })}
+            options={[
+              { value: "rectangle", label: "Rectangle" },
+              { value: "rounded", label: "Rounded" },
+              { value: "pill", label: "Pill" },
+              { value: "circle", label: "Circle" },
+              { value: "diamond", label: "Diamond" },
+              { value: "cylinder", label: "Cylinder" },
+            ]}
+            size="sm"
+          />
+        </Field>
+        <Field label="Corner Radius">
+          <input
+            type="number"
+            value={first.style.borderRadius}
+            onChange={(e) =>
+              onChange({ style: { ...first.style, borderRadius: Number(e.target.value) } })
+            }
+            className="input"
+            min={0}
+          />
+        </Field>
+      </Section>
+
+      <Section title="Fill">
+        <div className="flex gap-2 items-center">
+          <ColorInput
+            value={first.style.fill}
+            onChange={(fill) => onChange({ style: { ...first.style, fill } })}
+          />
+          <input
+            type="text"
+            value={first.style.fill}
+            onChange={(e) => onChange({ style: { ...first.style, fill: e.target.value } })}
+            className="input flex-1"
+          />
+        </div>
+        <Field label="Opacity">
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={first.style.fillOpacity}
+            onChange={(e) =>
+              onChange({ style: { ...first.style, fillOpacity: Number(e.target.value) } })
+            }
+            className="w-full"
+          />
+        </Field>
+      </Section>
+
+      <Section title="Stroke">
+        <div className="flex gap-2 items-center">
+          <ColorInput
+            value={first.style.stroke}
+            onChange={(stroke) => onChange({ style: { ...first.style, stroke } })}
+          />
+          <input
+            type="text"
+            value={first.style.stroke}
+            onChange={(e) => onChange({ style: { ...first.style, stroke: e.target.value } })}
+            className="input flex-1"
+          />
+        </div>
+        <Field label="Width">
+          <input
+            type="number"
+            value={first.style.strokeWidth}
+            onChange={(e) =>
+              onChange({ style: { ...first.style, strokeWidth: Number(e.target.value) } })
+            }
+            className="input"
+            min={0}
+            step={0.5}
+          />
+        </Field>
+      </Section>
+
+      <Section title="Title Style">
+        <Field label="Font">
+          <Dropdown
+            value={first.titleStyle.fontFamily}
+            onChange={(value) =>
+              onChange({ titleStyle: { ...first.titleStyle, fontFamily: value } })
+            }
+            options={FONT_OPTIONS}
+            size="sm"
+          />
+        </Field>
+        <Field label="Font Size">
+          <input
+            type="number"
+            value={first.titleStyle.fontSize}
+            onChange={(e) =>
+              onChange({ titleStyle: { ...first.titleStyle, fontSize: Number(e.target.value) } })
+            }
+            className="input"
+            min={8}
+          />
+        </Field>
+        <Field label="Color">
+          <div className="flex gap-2 items-center">
+            <ColorInput
+              value={first.titleStyle.color}
+              onChange={(color) =>
+                onChange({ titleStyle: { ...first.titleStyle, color } })
+              }
+            />
+            <input
+              type="text"
+              value={first.titleStyle.color}
+              onChange={(e) =>
+                onChange({ titleStyle: { ...first.titleStyle, color: e.target.value } })
+              }
+              className="input flex-1"
+            />
+          </div>
+        </Field>
+      </Section>
+
+      <Section title="Subtitle Style">
+        <Field label="Color">
+          <div className="flex gap-2 items-center">
+            <ColorInput
+              value={first.subtitleStyle?.color || "#1a1a1a"}
+              onChange={(color) =>
+                onChange({
+                  subtitleStyle: {
+                    ...(first.subtitleStyle || {
+                      fontFamily: "Inter, system-ui, sans-serif",
+                      fontSize: 10,
+                      fontWeight: "normal" as const,
+                      textAlign: "center" as const,
+                    }),
+                    color,
+                  },
+                })
+              }
+            />
+            <input
+              type="text"
+              value={first.subtitleStyle?.color || "#1a1a1a"}
+              onChange={(e) =>
+                onChange({
+                  subtitleStyle: {
+                    ...(first.subtitleStyle || {
+                      fontFamily: "Inter, system-ui, sans-serif",
+                      fontSize: 10,
+                      fontWeight: "normal" as const,
+                      textAlign: "center" as const,
+                    }),
+                    color: e.target.value,
+                  },
+                })
+              }
+              className="input flex-1"
+            />
+          </div>
+        </Field>
+      </Section>
+
+      <Section title="Text Position">
+        <Field label="Vertical Offset">
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={-30}
+              max={30}
+              step={1}
+              value={first.textVerticalOffset || 0}
+              onChange={(e) =>
+                onChange({ textVerticalOffset: Number(e.target.value) })
+              }
+              className="flex-1"
+            />
+            <span className="text-xs text-gray-500 w-10 text-right">
+              {first.textVerticalOffset || 0}px
+            </span>
+          </div>
+        </Field>
+      </Section>
+    </>
   );
 }
 

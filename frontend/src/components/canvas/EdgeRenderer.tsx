@@ -328,6 +328,14 @@ function ArrowHead({ type, size, color }: { type: string; size: number; color: s
           fill={color}
         />
       );
+    case "barbed":
+      // Curved concave base for a more decorative arrowhead
+      return (
+        <path
+          d={`M 0,0 L ${size},${half} L 0,${size} Q ${size * 0.35},${half} 0,0`}
+          fill={color}
+        />
+      );
     case "open":
       return (
         <polyline

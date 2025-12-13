@@ -465,9 +465,9 @@ export function Canvas() {
     }
   };
 
-  // Sort elements: containers first, then edges, then nodes/text
+  // Sort elements: containers first, then nodes/text, then edges (so edges render on top of node outer bands)
   const sortedElements = [...diagram.elements].sort((a, b) => {
-    const order = { container: 0, edge: 1, node: 2, text: 3, image: 4 };
+    const order = { container: 0, node: 1, text: 2, image: 3, edge: 4 };
     return (order[a.type] || 0) - (order[b.type] || 0);
   });
 
