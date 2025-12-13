@@ -1,0 +1,25 @@
+# Romans Cool Diagram Software (RCDS)
+# Created by Roman Slack
+# https://rcds.app
+
+User-agent: *
+Allow: /
+
+# Sitemaps
+Sitemap: https://rcds.app/sitemap.xml
+
+# Crawl-delay for polite crawling
+Crawl-delay: 1
+
+# Block common bot paths that don't apply
+Disallow: /api/
+Disallow: /_next/
+Disallow: /static/
+
+# Allow important assets
+Allow: /*.js$
+Allow: /*.css$
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.svg$
+Allow: /*.ico$

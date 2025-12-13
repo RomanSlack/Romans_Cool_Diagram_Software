@@ -1,0 +1,29 @@
+{
+  "name": "Romans Cool Diagram Software",
+  "short_name": "RCDS",
+  "description": "Free, open-source diagram editor by Roman Slack. Create beautiful architecture diagrams, flowcharts, and system designs.",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
+  "icons": [
+    {
+      "src": "/android-chrome-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/android-chrome-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "theme_color": "#D8E5F3",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "any",
+  "categories": ["productivity", "utilities", "design"],
+  "lang": "en",
+  "dir": "ltr"
+}
