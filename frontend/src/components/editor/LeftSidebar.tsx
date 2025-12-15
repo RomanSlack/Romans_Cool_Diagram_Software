@@ -43,6 +43,7 @@ export function LeftSidebar() {
   const edges = elements.filter((e) => e.type === "edge");
   const texts = elements.filter((e) => e.type === "text");
   const containers = elements.filter((e) => e.type === "container");
+  const images = elements.filter((e) => e.type === "image");
 
   // Auto-save every 30 seconds when changes occur
   useEffect(() => {
@@ -303,6 +304,15 @@ export function LeftSidebar() {
                 />
               )}
 
+              {images.length > 0 && (
+                <ElementGroup
+                  icon={ImageIcon}
+                  label="Images"
+                  count={images.length}
+                  elements={images}
+                />
+              )}
+
               {edges.length > 0 && (
                 <ElementGroup
                   icon={ArrowRight}
@@ -402,6 +412,9 @@ function ElementGroup({
     }
     if (element.type === "container" && "label" in element && element.label) {
       return element.label.text || el.id;
+    }
+    if (element.type === "image" && "label" in element) {
+      return element.label || "Image";
     }
     return el.id;
   };

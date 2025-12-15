@@ -9,6 +9,7 @@ import {
   TextElement,
   ContainerElement,
   EdgeElement,
+  ImageElement,
   NODE_PRESETS,
   FONT_OPTIONS,
 } from "@/lib/schema/types";
@@ -296,6 +297,12 @@ export function Inspector() {
             onChange={(updates) => updateElement(selectedElement.id, updates)}
           />
         )}
+        {selectedElement.type === "image" && (
+          <ImageInspector
+            element={selectedElement as ImageElement}
+            onChange={(updates) => updateElement(selectedElement.id, updates)}
+          />
+        )}
       </div>
     </div>
   );
@@ -307,6 +314,7 @@ function getElementTypeName(type: string): string {
     text: "Text",
     container: "Container",
     edge: "Edge",
+    image: "Image",
   };
   return names[type] || type;
 }
@@ -1266,6 +1274,245 @@ function EdgeInspector({ element, onChange }: EdgeInspectorProps) {
             placeholder="Add label..."
           />
         </Field>
+      </Section>
+    </div>
+  );
+}
+
+// ============ IMAGE INSPECTOR ============
+
+interface ImageInspectorProps {
+  element: ImageElement;
+  onChange: (updates: Partial<ImageElement>) => void;
+}
+
+function ImageInspector({ element, onChange }: ImageInspectorProps) {
+  // Calculate aspect ratio for lock
+  const aspectRatio = element.naturalWidth / element.naturalHeight;
+
+  const handleWidthChange = (width: number) => {
+    const height = Math.round(width / aspectRatio);
+    onChange({ size: { width, height } });
+  };
+
+  const handleHeightChange = (height: number) => {
+    const width = Math.round(height * aspectRatio);
+    onChange({ size: { width, height } });
+  };
+
+  return (
+    <div className="p-4 space-y-6">
+      {/* Label */}
+      <Section title="Label">
+        <Field label="Caption">
+          <input
+            type="text"
+            value={element.label || ""}
+            onChange={(e) => onChange({ label: e.target.value || undefined })}
+            className="input"
+            placeholder="Optional caption..."
+          />
+        </Field>
+      </Section>
+
+      {/* Position & Size */}
+      <Section title="Transform">
+        <div className="grid grid-cols-2 gap-2">
+          <Field label="X">
+            <input
+              type="number"
+              value={Math.round(element.position.x)}
+              onChange={(e) =>
+                onChange({ position: { ...element.position, x: Number(e.target.value) } })
+              }
+              className="input"
+            />
+          </Field>
+          <Field label="Y">
+            <input
+              type="number"
+              value={Math.round(element.position.y)}
+              onChange={(e) =>
+                onChange({ position: { ...element.position, y: Number(e.target.value) } })
+              }
+              className="input"
+            />
+          </Field>
+          <Field label="Width">
+            <input
+              type="number"
+              value={Math.round(element.size.width)}
+              onChange={(e) => handleWidthChange(Number(e.target.value))}
+              className="input"
+              min={20}
+            />
+          </Field>
+          <Field label="Height">
+            <input
+              type="number"
+              value={Math.round(element.size.height)}
+              onChange={(e) => handleHeightChange(Number(e.target.value))}
+              className="input"
+              min={20}
+            />
+          </Field>
+        </div>
+        <p className="text-xs text-gray-400 mt-1">
+          Size changes maintain aspect ratio
+        </p>
+      </Section>
+
+      {/* Appearance */}
+      <Section title="Appearance">
+        <Field label="Opacity">
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={element.style.opacity}
+              onChange={(e) =>
+                onChange({ style: { ...element.style, opacity: Number(e.target.value) } })
+              }
+              className="flex-1"
+            />
+            <span className="text-xs text-gray-500 w-10 text-right">
+              {Math.round(element.style.opacity * 100)}%
+            </span>
+          </div>
+        </Field>
+        <Field label="Corner Radius">
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={Math.min(element.size.width, element.size.height) / 2}
+              step={1}
+              value={element.style.borderRadius}
+              onChange={(e) =>
+                onChange({ style: { ...element.style, borderRadius: Number(e.target.value) } })
+              }
+              className="flex-1"
+            />
+            <span className="text-xs text-gray-500 w-10 text-right">
+              {element.style.borderRadius}px
+            </span>
+          </div>
+        </Field>
+      </Section>
+
+      {/* Border */}
+      <Section title="Border">
+        <Field label="Width">
+          <input
+            type="number"
+            value={element.style.strokeWidth}
+            onChange={(e) =>
+              onChange({ style: { ...element.style, strokeWidth: Number(e.target.value) } })
+            }
+            className="input"
+            min={0}
+            step={0.5}
+          />
+        </Field>
+        {element.style.strokeWidth > 0 && (
+          <Field label="Color">
+            <div className="flex gap-2 items-center">
+              <ColorInput
+                value={element.style.stroke}
+                onChange={(stroke) => onChange({ style: { ...element.style, stroke } })}
+              />
+              <input
+                type="text"
+                value={element.style.stroke}
+                onChange={(e) => onChange({ style: { ...element.style, stroke: e.target.value } })}
+                className="input flex-1"
+              />
+            </div>
+          </Field>
+        )}
+      </Section>
+
+      {/* Shadow */}
+      <Section title="Shadow">
+        <Field label="Enabled">
+          <input
+            type="checkbox"
+            checked={!!element.style.shadow}
+            onChange={(e) =>
+              onChange({
+                style: {
+                  ...element.style,
+                  shadow: e.target.checked
+                    ? { x: 2, y: 2, blur: 6, color: "rgba(0,0,0,0.15)" }
+                    : null,
+                },
+              })
+            }
+            className="w-4 h-4"
+          />
+        </Field>
+        {element.style.shadow && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <Field label="X">
+                <input
+                  type="number"
+                  value={element.style.shadow.x}
+                  onChange={(e) =>
+                    onChange({
+                      style: {
+                        ...element.style,
+                        shadow: { ...element.style.shadow!, x: Number(e.target.value) },
+                      },
+                    })
+                  }
+                  className="input"
+                />
+              </Field>
+              <Field label="Y">
+                <input
+                  type="number"
+                  value={element.style.shadow.y}
+                  onChange={(e) =>
+                    onChange({
+                      style: {
+                        ...element.style,
+                        shadow: { ...element.style.shadow!, y: Number(e.target.value) },
+                      },
+                    })
+                  }
+                  className="input"
+                />
+              </Field>
+            </div>
+            <Field label="Blur">
+              <input
+                type="number"
+                value={element.style.shadow.blur}
+                onChange={(e) =>
+                  onChange({
+                    style: {
+                      ...element.style,
+                      shadow: { ...element.style.shadow!, blur: Number(e.target.value) },
+                    },
+                  })
+                }
+                className="input"
+                min={0}
+              />
+            </Field>
+          </>
+        )}
+      </Section>
+
+      {/* Image Info */}
+      <Section title="Image Info">
+        <div className="text-xs text-gray-500 space-y-1">
+          <p>Original: {element.naturalWidth} x {element.naturalHeight}px</p>
+          <p>Current: {Math.round(element.size.width)} x {Math.round(element.size.height)}px</p>
+        </div>
       </Section>
     </div>
   );

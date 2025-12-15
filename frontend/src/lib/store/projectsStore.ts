@@ -14,6 +14,7 @@ interface ProjectsState {
   projects: { [id: string]: { meta: ProjectMeta; diagram: Diagram } };
   currentProjectId: string | null;
   lastAutoSave: number | null;
+  _hasHydrated: boolean;
 
   // Actions
   saveProject: (diagram: Diagram) => string;
@@ -23,6 +24,7 @@ interface ProjectsState {
   getProjectList: () => ProjectMeta[];
   setCurrentProject: (id: string | null) => void;
   autoSave: (diagram: Diagram) => void;
+  setHasHydrated: (state: boolean) => void;
 }
 
 export const useProjectsStore = create<ProjectsState>()(
@@ -31,6 +33,9 @@ export const useProjectsStore = create<ProjectsState>()(
       projects: {},
       currentProjectId: null,
       lastAutoSave: null,
+      _hasHydrated: false,
+
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
 
       saveProject: (diagram) => {
         const id = diagram.id || crypto.randomUUID();
@@ -111,6 +116,9 @@ export const useProjectsStore = create<ProjectsState>()(
     }),
     {
       name: "rcds-projects",
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );

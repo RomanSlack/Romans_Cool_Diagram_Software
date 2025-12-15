@@ -38,7 +38,7 @@ export interface Diagram {
   selectedIds?: string[];
 }
 
-export type DiagramElement = NodeElement | EdgeElement | TextElement | ContainerElement;
+export type DiagramElement = NodeElement | EdgeElement | TextElement | ContainerElement | ImageElement;
 
 export interface CanvasSettings {
   width: number;
@@ -211,6 +211,48 @@ export interface ContainerLabel {
   style: TextStyle;
 }
 
+// ============ IMAGE ELEMENT ============
+// Images that can be placed on the canvas with styling
+
+export interface ImageElement extends BaseElement {
+  type: "image";
+
+  // Image data (base64 data URL)
+  src: string;
+
+  // Original dimensions (for aspect ratio)
+  naturalWidth: number;
+  naturalHeight: number;
+
+  // Style
+  style: ImageStyle;
+
+  // Optional label
+  label?: string;
+}
+
+export interface ImageStyle {
+  opacity: number;
+  borderRadius: number;
+  shadow: ShadowStyle | null;
+  // Border/stroke
+  stroke: string;
+  strokeWidth: number;
+}
+
+export const DEFAULT_IMAGE_STYLE: ImageStyle = {
+  opacity: 1,
+  borderRadius: 0,
+  shadow: {
+    x: 2,
+    y: 2,
+    blur: 6,
+    color: "rgba(0,0,0,0.15)",
+  },
+  stroke: "transparent",
+  strokeWidth: 0,
+};
+
 // ============ FONT OPTIONS ============
 
 export const FONT_OPTIONS = [
@@ -372,6 +414,31 @@ export function createEdge(
     style: { ...DEFAULT_EDGE_STYLE },
     startArrow: null,
     endArrow: { type: "barbed", size: 8 },
+    ...partial,
+  };
+}
+
+export function createImage(
+  src: string,
+  naturalWidth: number,
+  naturalHeight: number,
+  partial: Partial<ImageElement> = {}
+): ImageElement {
+  // Calculate default size maintaining aspect ratio (max 300px width)
+  const maxWidth = 300;
+  const scale = Math.min(1, maxWidth / naturalWidth);
+  const width = Math.round(naturalWidth * scale);
+  const height = Math.round(naturalHeight * scale);
+
+  return {
+    id: `image-${Date.now()}`,
+    type: "image",
+    position: { x: 100, y: 100 },
+    size: { width, height },
+    src,
+    naturalWidth,
+    naturalHeight,
+    style: { ...DEFAULT_IMAGE_STYLE },
     ...partial,
   };
 }

@@ -9,6 +9,7 @@ import {
   createText,
   createContainer,
   createEdge,
+  createImage,
 } from "@/lib/schema/types";
 
 export type ActiveTool = "select" | "connect";
@@ -78,6 +79,7 @@ interface DiagramState {
   addText: (position?: Position) => void;
   addContainer: (position?: Position) => void;
   addEdge: (sourceId: string, targetId: string, sourceAnchor?: string, targetAnchor?: string) => void;
+  addImage: (src: string, naturalWidth: number, naturalHeight: number, position?: Position) => void;
 
   // Tool
   setActiveTool: (tool: ActiveTool) => void;
@@ -410,6 +412,15 @@ export const useDiagramStore = create<DiagramState>((set, get) => ({
       },
       selectedIds: [edge.id],
     }));
+  },
+
+  addImage: (src, naturalWidth, naturalHeight, position) => {
+    const viewport = get().viewport;
+    const pos = position || {
+      x: (-viewport.x + 400) / viewport.zoom,
+      y: (-viewport.y + 250) / viewport.zoom,
+    };
+    get().addElement(createImage(src, naturalWidth, naturalHeight, { position: pos }));
   },
 
   setActiveTool: (tool) => set({ activeTool: tool }),

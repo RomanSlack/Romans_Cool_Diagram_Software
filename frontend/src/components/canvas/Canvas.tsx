@@ -6,9 +6,10 @@ import { NodeRenderer } from "./NodeRenderer";
 import { TextRenderer } from "./TextRenderer";
 import { ContainerRenderer } from "./ContainerRenderer";
 import { EdgeRenderer } from "./EdgeRenderer";
+import { ImageRenderer } from "./ImageRenderer";
 import { SelectionBox } from "./SelectionBox";
 import { ConnectionHandles } from "./ConnectionHandles";
-import { DiagramElement, NodeElement, TextElement, ContainerElement, EdgeElement } from "@/lib/schema/types";
+import { DiagramElement, NodeElement, TextElement, ContainerElement, EdgeElement, ImageElement } from "@/lib/schema/types";
 
 export function Canvas() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -460,6 +461,27 @@ export function Canvas() {
             }}
           />
         );
+      case "image":
+        return (
+          <g
+            key={element.id}
+            onMouseEnter={() => setHoveredElement(element.id)}
+            onMouseLeave={() => setHoveredElement(null)}
+          >
+            <ImageRenderer
+              element={element as ImageElement}
+              isSelected={isSelected}
+              onMouseDown={(e) => handleElementMouseDown(e, element)}
+            />
+            {(isHovered || isSelected || activeTool === "connect") && (
+              <ConnectionHandles
+                element={element}
+                onStartConnection={handleConnectionStart}
+                zoom={viewport.zoom}
+              />
+            )}
+          </g>
+        );
       default:
         return null;
     }
@@ -480,10 +502,37 @@ export function Canvas() {
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
-      const elementType = e.dataTransfer.getData("elementType") as "node" | "text" | "container";
-      if (!elementType) return;
 
       const canvasPos = screenToCanvas(e.clientX, e.clientY);
+
+      // Check if dropping files (images)
+      const files = e.dataTransfer.files;
+      if (files && files.length > 0) {
+        Array.from(files).forEach((file) => {
+          // Only handle image files
+          if (!file.type.startsWith("image/")) return;
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const dataUrl = event.target?.result as string;
+            if (!dataUrl) return;
+
+            // Create an image to get natural dimensions
+            const img = new Image();
+            img.onload = () => {
+              const { addImage } = useDiagramStore.getState();
+              addImage(dataUrl, img.naturalWidth, img.naturalHeight, canvasPos);
+            };
+            img.src = dataUrl;
+          };
+          reader.readAsDataURL(file);
+        });
+        return;
+      }
+
+      // Check for element type (from toolbar drag)
+      const elementType = e.dataTransfer.getData("elementType") as "node" | "text" | "container";
+      if (!elementType) return;
 
       // Import the create functions
       const { addNode, addText, addContainer } = useDiagramStore.getState();
